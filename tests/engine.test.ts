@@ -128,7 +128,7 @@ function rigWall(h0: string, h1: string, draws: string): string[] {
 }
 
 function makeGame(wall: string[], opts: { myWords?: string[]; settings?: Partial<RoomSettings> } = {}) {
-  const settings: RoomSettings = { ...DEFAULT_SETTINGS, playerCount: 2, timer: "none", judgeMode: "assist", ...opts.settings };
+  const settings: RoomSettings = { ...DEFAULT_SETTINGS, playerCount: 2, timer: "none", judgeMode: "assist", riipaiSeconds: 0, ...opts.settings };
   const p1lex = opts.myWords ? lex.extend(opts.myWords.map((word) => ({ word, verified: false }))) : lex;
   const approved: string[] = [];
   const game = new Game({
@@ -397,5 +397,27 @@ describe("自己申告", () => {
     if (v.actions?.kind !== "turn") throw new Error("not turn");
     expect(v.actions.riichiDiscards.length).toBe(14);
     expect(v.waits).toEqual([]);
+  });
+});
+
+describe("理牌タイム", () => {
+  it("局の始めは全員が理牌を終えるまで始まらず、親は14枚で待つ", () => {
+    const { game } = makeGame(rigWall("ねこさくらくるまたぬききつ", "いぬそらやまかさはないすと", "ね"), { settings: { judgeMode: "declare", riipaiSeconds: 180 } });
+    let v = game.viewFor("a");
+    expect(v.phase).toBe("riipai");
+    expect(v.myHand.length).toBe(14);
+    expect(v.actions).toBeNull();
+    expect(game.act("a", { type: "discard", tileId: v.myHand[0].id })).not.toBeNull();
+    arrangeAs(game, "a", ["ねこ", "さくら", "くるま", "たぬき", "きつね"]);
+    game.act("a", { type: "riipaiDone" });
+    expect(game.viewFor("b").riipai?.waiting).toEqual(["B"]);
+    game.act("b", { type: "riipaiDone" });
+    v = game.viewFor("a");
+    expect(v.phase).toBe("play");
+    expect(v.actions?.kind === "turn" && v.actions.canTsumo).toBe(true);
+    // 理牌した形のまま天和を宣言できる
+    game.act("a", { type: "tsumo" });
+    game.act("b", { type: "vote", votes: {} });
+    expect(game.viewFor("a").result?.wins[0].yaku.map((y) => y.name)).toContain("天和");
   });
 });

@@ -24,7 +24,9 @@ export interface RoomSettings {
   /** declare=自己申告（アナログ準拠。いつでも宣言でき、他の人が確認） / assist=アガれる形のときだけボタンが出る */
   judgeMode: "declare" | "assist";
   /** 自己申告で、打牌のあとロン・ポン・カンを受け付ける秒数 */
-  callSeconds: 2 | 3 | 5;
+  callSeconds: 5 | 8 | 10 | 12;
+  /** 局の始めに全員で理牌する時間（秒）。0=なし */
+  riipaiSeconds: 0 | 60 | 180 | 300;
 }
 
 export const DEFAULT_SETTINGS: RoomSettings = {
@@ -37,7 +39,8 @@ export const DEFAULT_SETTINGS: RoomSettings = {
   calls: true,
   rejectPenalty: "chombo",
   judgeMode: "declare",
-  callSeconds: 2,
+  callSeconds: 5,
+  riipaiSeconds: 180,
 };
 
 export const TIMER_SECONDS: Record<TimerPreset, { base: number; bank: number }> = {
@@ -235,7 +238,9 @@ export interface GameView {
   dealer: number;
   liveRemaining: number;
   turn: number;
-  phase: "play" | "calls" | "claim" | "vote" | "result" | "final";
+  phase: "riipai" | "play" | "calls" | "claim" | "vote" | "result" | "final";
+  /** 理牌タイム（局の始め） */
+  riipai: { deadline: number | null; waiting: string[]; done: boolean } | null;
   judgeMode: "declare" | "assist";
   /** 宣言中などのお知らせ */
   notice: string | null;
@@ -269,4 +274,5 @@ export type GameAction =
   | { type: "ronCancel" }
   | { type: "callDetail"; tileIds?: number[]; cancel?: boolean }
   | { type: "vote"; votes: Record<number, boolean> }
-  | { type: "ready" };
+  | { type: "ready" }
+  | { type: "riipaiDone" };

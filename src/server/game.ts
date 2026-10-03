@@ -126,7 +126,10 @@ export class Game {
   private drawPos = 0;
   private rinshanTaken = 0;
   turn = 0;
-  step: "turn" | "calls" | "claim" | "vote" | "result" | "final" = "turn";
+  step: "riipai" | "turn" | "calls" | "claim" | "vote" | "result" | "final" = "turn";
+  /** 理牌タイム：終わった席と締め切り */
+  private riipaiDone = new Set<number>();
+  private riipaiDeadline: number | null = null;
   /** 自己申告のロン宣言（ロン牌を入れる位置を選んでいる） */
   private pendingRon: { seat: number; comp: Completed | null; startedAt: number; cancelled: boolean }[] = [];
   /** 自己申告のポン・カン（語を選んでいる） */
@@ -353,12 +356,41 @@ export class Game {
     for (const hp of this.hands) hp.arr = reconcile(null, hp.hand);
     this.emit("start", this.dealer, `${WIND_NAMES[this.roundWind]}${this.kyoku + 1}局`);
     this.log(`=== ${WIND_NAMES[this.roundWind]}${this.kyoku + 1}局 ${this.honba}本場 ===`);
-    this.beginTurn(this.dealer, "draw");
+    // 親は先に14枚目をツモっておき、全員で理牌してから始める（天和の可能性を残す）
+    const dp = this.hands[this.dealer];
+    const first = this.wall[this.drawPos++];
+    dp.hand.push(first);
+    dp.drawnId = first.id;
+    dp.arr = reconcile(dp.arr, dp.hand);
+    const secs = this.settings.riipaiSeconds ?? 0;
+    this.riipaiDone = new Set(this.players.map((p, i) => (p.isBot || !p.connected ? i : -1)).filter((i) => i >= 0));
+    if (secs > 0 && this.riipaiDone.size < this.n) {
+      this.step = "riipai";
+      this.turn = this.dealer;
+      this.turnActions = null;
+      this.riipaiDeadline = this.fast ? null : Date.now() + secs * 1000;
+      this.setTimer("riipai", this.fast ? 0 : secs * 1000, () => this.endRiipai());
+      return;
+    }
+    this.beginTurn(this.dealer, "dealt");
+  }
+
+  private endRiipai() {
+    if (this.step !== "riipai") return;
+    this.clearTimer("riipai");
+    this.riipaiDeadline = null;
+    this.beginTurn(this.dealer, "dealt");
+  }
+
+  private markRiipaiDone(seat: number) {
+    if (this.step !== "riipai") return;
+    this.riipaiDone.add(seat);
+    if (this.riipaiDone.size >= this.n) this.endRiipai();
   }
 
   // ------------------------------------------------------------------ 手番
 
-  private beginTurn(seat: number, kind: "draw" | "afterCall" | "rinshan", count = 1) {
+  private beginTurn(seat: number, kind: "draw" | "dealt" | "afterCall" | "rinshan", count = 1) {
     this.turn = seat;
     this.step = "turn";
     this.afterCall = kind === "afterCall";
@@ -376,7 +408,7 @@ export class Game {
         hp.drawnId = t.id;
       }
       hp.tempFuriten = false;
-    } else {
+    } else if (kind === "afterCall") {
       hp.drawnId = null;
     }
     hp.arr = reconcile(hp.arr, hp.hand);
@@ -1522,6 +1554,9 @@ export class Game {
       case "vote":
         err = this.castVote(seat, a.votes);
         break;
+      case "riipaiDone":
+        this.markRiipaiDone(seat);
+        break;
       case "ready":
         this.markReady(seat);
         break;
@@ -1555,6 +1590,7 @@ export class Game {
         if (this.vote.voters.every((s) => this.vote!.votes.has(s))) this.resolveVote();
       }
       if (this.step === "result") this.markReady(seat);
+      if (this.step === "riipai") this.markRiipaiDone(seat);
       if (this.step === "calls" && this.declare && this.calls.get(seat) && !this.calls.get(seat)!.response) this.respondCall(seat, { call: "pass" });
       if (this.step === "claim" && this.callDetail?.seat === seat) this.resolveCallDetail(seat, null);
       if (this.step === "claim" && this.pendingRon.some((p) => p.seat === seat && !p.comp && !p.cancelled)) {
@@ -1671,6 +1707,14 @@ export class Game {
       lastDiscard: this.lastDiscard ? { seat: this.lastDiscard.seat, tileId: this.lastDiscard.tile.id } : null,
       events: this.events,
       waits,
+      riipai:
+        this.step === "riipai"
+          ? {
+              deadline: this.riipaiDeadline,
+              waiting: this.players.filter((_, i) => !this.riipaiDone.has(i)).map((p) => p.name),
+              done: mySeat !== null && this.riipaiDone.has(mySeat),
+            }
+          : null,
       readyWaiting: this.step === "result" ? this.players.filter((_, i) => !this.ready.has(i)).map((p) => p.name) : [],
       myTheme: playerId ? this.hooks.theme(playerId) : null,
     };

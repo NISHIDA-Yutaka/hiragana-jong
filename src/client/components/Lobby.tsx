@@ -127,14 +127,27 @@ export function Lobby() {
                 <Seg
                   value={s.callSeconds}
                   options={[
-                    [2, "2秒"],
-                    [3, "3秒"],
                     [5, "5秒"],
+                    [8, "8秒"],
+                    [10, "10秒"],
+                    [12, "12秒"],
                   ]}
                   onChange={(v) => set({ callSeconds: v as RoomSettings["callSeconds"] })}
                 />
               </Row>
             )}
+            <Row label="理牌時間">
+              <Seg
+                value={s.riipaiSeconds ?? 0}
+                options={[
+                  [0, "なし"],
+                  [60, "1分"],
+                  [180, "3分"],
+                  [300, "5分"],
+                ]}
+                onChange={(v) => set({ riipaiSeconds: v as RoomSettings["riipaiSeconds"] })}
+              />
+            </Row>
             <Row label="持ち時間">
               <Seg
                 value={s.timer}

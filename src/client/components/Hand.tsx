@@ -1,5 +1,5 @@
 // 自分の手牌：並べ替え（ドラッグ）・区切り（すき間をクリック）・語の入力で集める・打牌
-import { FormEvent, PointerEvent as RPointerEvent, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, PointerEvent as RPointerEvent, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Arrangement, groupIds } from "../../shared/arrange";
 import { charOrder, normalizeInput, Tile as TileT } from "../../shared/tiles";
 import { send, toast } from "../net";
@@ -42,6 +42,8 @@ export function Hand({ hand, serverArr, drawnId, locked, discardable, highlight,
   const [arr, setArr] = useState<Arrangement>(serverArr ?? { order: hand.map((t) => t.id), breaks: [] });
   const [selected, setSelected] = useState<number | null>(null);
   const [drag, setDrag] = useState<{ id: number; x0: number; y0: number; dx: number; dy: number; active: boolean } | null>(null);
+  /** 離した直後の牌（CSSのtransitionを止めておき、FLIPで滑らせる） */
+  const [settling, setSettling] = useState<number | null>(null);
   const [typed, setTyped] = useState("");
   const typedIds = useRef<Set<number>>(new Set());
   const rowRef = useRef<HTMLDivElement>(null);
@@ -62,8 +64,17 @@ export function Hand({ hand, serverArr, drawnId, locked, discardable, highlight,
   const valid = arr.order.length === hand.length && arr.order.every((id) => byId.has(id));
   const cur: Arrangement = valid ? arr : (serverArr ?? { order: hand.map((t) => t.id), breaks: [] });
 
+  // 牌の位置を覚えておき、並びが変わったら前の位置から滑らせる（FLIP）
+  const lastRects = useRef<Map<number, DOMRect>>(new Map());
+  const snapshot = () => {
+    const m = new Map<number, DOMRect>();
+    rowRef.current?.querySelectorAll<HTMLElement>("[data-id]").forEach((el) => m.set(Number(el.dataset.id), el.getBoundingClientRect()));
+    lastRects.current = m;
+  };
+
   const commit = (next: Arrangement) => {
     if (locked) return;
+    snapshot(); // ドラッグ中の位置も含めて記録してから並べ替える
     setArr(next);
     send("game:arrange", next);
   };
@@ -140,6 +151,10 @@ export function Hand({ hand, serverArr, drawnId, locked, discardable, highlight,
     if (!drag) return;
     const d = drag;
     setDrag(null);
+    if (d.active) {
+      setSettling(d.id);
+      setTimeout(() => setSettling((x) => (x === d.id ? null : x)), 300);
+    }
     if (!d.active) {
       clickTile(d.id);
       return;
@@ -201,6 +216,36 @@ export function Hand({ hand, serverArr, drawnId, locked, discardable, highlight,
     commit(base);
   };
 
+  const orderKey = cur.order.join(",") + "|" + cur.breaks.join(",");
+  useLayoutEffect(() => {
+    const row = rowRef.current;
+    if (!row) return;
+    const prev = lastRects.current;
+    const first = prev.size === 0;
+    row.querySelectorAll<HTMLElement>("[data-id]").forEach((el) => {
+      const id = Number(el.dataset.id);
+      const r = el.getBoundingClientRect();
+      const p = prev.get(id);
+      if (p) {
+        const dx = (p.left - r.left) / scale;
+        const dy = (p.top - r.top) / scale;
+        if (Math.abs(dx) > 0.5 || Math.abs(dy) > 0.5) {
+          el.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: "translate(0, 0)" }], { duration: 220, easing: "cubic-bezier(.2,.8,.2,1)" });
+        }
+      } else {
+        // 新しく来た牌（配牌・ツモ）は上から落とす
+        el.animate([{ transform: "translateY(-36px)", opacity: 0 }, { transform: "translateY(0)", opacity: 1 }], {
+          duration: 260,
+          delay: first ? Math.random() * 120 : 0,
+          easing: "ease-out",
+          fill: "backwards",
+        });
+      }
+    });
+    snapshot();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orderKey, handKey]);
+
   const groups = groupIds(cur);
   const lastGroup = groups[groups.length - 1];
   const shape = shapeLabel(groups.map((x) => x.length), meldCount);
@@ -229,6 +274,7 @@ export function Hand({ hand, serverArr, drawnId, locked, discardable, highlight,
                       dim ? "dim" : "",
                       highlight?.has(id) ? "hl" : "",
                       id === drawnId ? "drawn" : "",
+                      drag?.id === id || settling === id ? "no-trans" : "",
                     ].join(" ")}
                     style={isDrag ? { transform: `translate(${drag!.dx / scale}px, ${drag!.dy / scale}px)` } : undefined}
                     onPointerDown={(e) => onDown(e, id)}

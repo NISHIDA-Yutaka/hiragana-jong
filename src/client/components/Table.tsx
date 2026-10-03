@@ -343,7 +343,15 @@ export function Table() {
             )}
 
             <div className="action-bar">
-              {chooser ? (
+              {g.riipai ? (
+                g.riipai.done ? (
+                  <span className="ab-hint">ほかの人の理牌を待っています…</span>
+                ) : (
+                  <button className="abtn abtn-riipai" onClick={() => act({ type: "riipaiDone" })}>
+                    理牌完了
+                  </button>
+                )
+              ) : chooser ? (
                 <>
                   <span className="ab-title">{chooser.title}</span>
                   {chooser.options.map((o) => (
@@ -461,6 +469,7 @@ export function Table() {
         )}
         {spectator && <div className="spectator-note">観戦中</div>}
         {g.notice && <div className="notice-banner">{g.notice}</div>}
+        {g.riipai && <RiipaiBoard r={g.riipai} />}
       </div>
 
       {actions?.kind === "ronPlace" && (
@@ -522,4 +531,25 @@ function useUnreadChat(open: boolean) {
   const last = chat.length ? chat[chat.length - 1].id : 0;
   if (open) seen.current = last;
   return chat.filter((m) => m.id > seen.current && !m.system).length;
+}
+
+function RiipaiBoard({ r }: { r: NonNullable<GameView["riipai"]> }) {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 250);
+    return () => clearInterval(t);
+  }, []);
+  const left = r.deadline ? Math.max(0, Math.ceil((r.deadline - now) / 1000)) : null;
+  return (
+    <div className="riipai-board">
+      <div className="rb-title">理牌タイム</div>
+      {left !== null && (
+        <div className={`rb-time ${left <= 10 ? "urgent" : ""}`}>
+          {Math.floor(left / 60)}:{String(left % 60).padStart(2, "0")}
+        </div>
+      )}
+      <div className="rb-lead">手牌を語ごとに並べてください。全員が「理牌完了」を押すか、時間になると始まります。</div>
+      {r.waiting.length > 0 && <div className="rb-wait">理牌中：{r.waiting.join("、")}</div>}
+    </div>
+  );
 }
