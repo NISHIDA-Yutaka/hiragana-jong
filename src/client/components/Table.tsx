@@ -3,6 +3,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { CallOption, GameEvent, GameView } from "../../shared/protocol";
 import { emit, lsGet, lsSet, send, toast, useStore } from "../net";
 import { callSound, chime, clack, prefs, riichiSound, say, setPref, tick } from "../sound";
+import { CallDetailDialog, PlaceDialog, toGroups, TsumoDialog } from "./Declare";
 import { Hand } from "./Hand";
 import { FinalModal, ResultModal, VoteModal } from "./Overlays";
 import { ChatPanel, MyWordsPanel, RoomWordsPanel, ThemePanel, YakuPanel } from "./Panels";
@@ -61,6 +62,8 @@ export function Table() {
   const [chooser, setChooser] = useState<null | { title: string; options: CallOption[]; onPick: (o: CallOption) => void }>(null);
   const [auto, setAuto] = useState(() => lsGet("auto", { win: false, noCall: false, tsumogiri: false }));
   const [oneClick, setOneClick] = useState(() => lsGet("oneClick", false));
+  const [tsumoOpen, setTsumoOpen] = useState(false);
+  const declare = g.judgeMode === "declare";
   const [, force] = useState(0);
   const lastSeq = useRef<number>(Math.max(0, ...g.events.map((e) => e.seq)));
   const unreadChat = useUnreadChat(panel === "chat");
@@ -86,7 +89,7 @@ export function Table() {
         else callSound();
         say(e.type === "riichi" && e.text === "オープンリーチ" ? "オープンリーチ" : text);
         const key = e.seq;
-        const sub = e.type === "riichi" ? (e.text === "オープンリーチ" ? "オープン" : undefined) : e.type === "abort" || e.type === "chombo" ? e.text : e.text;
+        const sub = e.type === "riichi" ? (e.text === "オープンリーチ" ? "オープン" : undefined) : e.type === "chombo" ? undefined : e.text;
         setCallouts((c) => [...c, { key, pos: e.type === "ryuukyoku" || e.type === "abort" ? ("center" as Pos) : pos, text, sub, kind: e.type }]);
         setTimeout(() => setCallouts((c) => c.filter((x) => x.key !== key)), 1700);
       }
@@ -121,17 +124,18 @@ export function Table() {
   useEffect(() => {
     setRiichiMode(null);
     setChooser(null);
+    setTsumoOpen(false);
   }, [actions?.kind, g.turn, g.phase]);
 
   // 自動和了・鳴きなし・ツモ切り
   useEffect(() => {
     if (spectator) return;
-    if (callA) {
+    if (callA && !declare) {
       if (callA.ron && auto.win) void act({ type: "call", call: "ron" });
       else if (!callA.ron && auto.noCall) void act({ type: "call", call: "pass" });
     } else if (turnA) {
-      if (turnA.canTsumo && auto.win) void act({ type: "tsumo" });
-      else if (auto.tsumogiri && !turnA.canTsumo && !turnA.afterCall && g.drawnId !== null && !turnA.locked) {
+      if (turnA.canTsumo && auto.win && !declare) void act({ type: "tsumo" });
+      else if (auto.tsumogiri && !turnA.afterCall && g.drawnId !== null && (declare || (!turnA.canTsumo && !turnA.locked))) {
         const id = g.drawnId;
         const t = setTimeout(() => act({ type: "discard", tileId: id }), 350);
         return () => clearTimeout(t);
@@ -298,21 +302,25 @@ export function Table() {
             </div>
 
             <div className="auto-toggles">
-              <label className={auto.win ? "on" : ""}>
-                <input type="checkbox" checked={auto.win} onChange={(e) => setAutoK("win", e.target.checked)} />
-                自動和了
-              </label>
-              <label className={auto.noCall ? "on" : ""}>
-                <input type="checkbox" checked={auto.noCall} onChange={(e) => setAutoK("noCall", e.target.checked)} />
-                鳴きなし
-              </label>
+              {!declare && (
+                <>
+                  <label className={auto.win ? "on" : ""}>
+                    <input type="checkbox" checked={auto.win} onChange={(e) => setAutoK("win", e.target.checked)} />
+                    自動和了
+                  </label>
+                  <label className={auto.noCall ? "on" : ""}>
+                    <input type="checkbox" checked={auto.noCall} onChange={(e) => setAutoK("noCall", e.target.checked)} />
+                    鳴きなし
+                  </label>
+                </>
+              )}
               <label className={auto.tsumogiri ? "on" : ""}>
                 <input type="checkbox" checked={auto.tsumogiri} onChange={(e) => setAutoK("tsumogiri", e.target.checked)} />
                 ツモ切り
               </label>
             </div>
 
-            {remain !== null && (isMyTurn || callA) && (
+            {remain !== null && (isMyTurn || (callA && !callA.declare)) && (
               <div className={`timer ${remain <= 5 ? "urgent" : ""}`}>
                 {remain > g.bank ? (
                   <>
@@ -349,9 +357,36 @@ export function Table() {
                 </>
               ) : riichiMode ? (
                 <>
-                  <span className="ab-title">光っている牌を切ってリーチ</span>
+                  <span className="ab-title">{declare ? "切る牌を選んでリーチ（テンパイかは自己申告）" : "光っている牌を切ってリーチ"}</span>
                   <button className="abtn abtn-skip" onClick={() => setRiichiMode(null)}>
                     キャンセル
+                  </button>
+                </>
+              ) : callA?.declare ? (
+                <>
+                  <span className="ab-title">
+                    <Tile ch={callA.tile.ch} size="xs" /> {g.seats[callA.fromSeat].name}
+                    {remain !== null && (
+                      <i className="window-bar">
+                        <i style={{ width: `${Math.min(100, (remain / room.settings.callSeconds) * 100)}%` }} />
+                      </i>
+                    )}
+                  </span>
+                  <button className="abtn abtn-ron" disabled={!callA.ron} onClick={() => act({ type: "call", call: "ron" })}>
+                    ロン
+                  </button>
+                  {room.settings.calls && (
+                    <>
+                      <button className="abtn abtn-kan" disabled={!callA.canKan} onClick={() => act({ type: "call", call: "kan" })}>
+                        カン
+                      </button>
+                      <button className="abtn abtn-pon" disabled={!callA.canPon} onClick={() => act({ type: "call", call: "pon" })}>
+                        ポン
+                      </button>
+                    </>
+                  )}
+                  <button className="abtn abtn-skip" onClick={() => act({ type: "call", call: "pass" })}>
+                    スキップ
                   </button>
                 </>
               ) : callA ? (
@@ -381,7 +416,7 @@ export function Table() {
               ) : turnA && g.phase === "play" ? (
                 <>
                   {turnA.canTsumo && (
-                    <button className="abtn abtn-ron" onClick={() => act({ type: "tsumo" })}>
+                    <button className={`abtn abtn-ron ${declare ? "abtn-quiet" : ""}`} onClick={() => (declare ? setTsumoOpen(true) : act({ type: "tsumo" }))}>
                       ツモ
                     </button>
                   )}
@@ -425,9 +460,55 @@ export function Table() {
           </>
         )}
         {spectator && <div className="spectator-note">観戦中</div>}
+        {g.notice && <div className="notice-banner">{g.notice}</div>}
       </div>
 
-      <div className="rotate-hint">スマホは横向きにすると遊びやすくなります</div>
+      {actions?.kind === "ronPlace" && (
+        <PlaceDialog
+          title="ロン"
+          lead="ロン牌を入れる場所を選んでください。認められないとチョンボ（満貫払い）です。"
+          groups={toGroups(g.arrangement, g.myHand)}
+          extra={actions.tile}
+          meldCount={myMelds.length}
+          deadline={g.deadline}
+          confirmLabel="この形で宣言"
+          onConfirm={(group, pos) => act({ type: "ronPlace", group, pos })}
+          cancelLabel="宣言を取り消す（チョンボ）"
+          onCancel={() => {
+            if (confirm("ロン宣言を取り消すとチョンボになります。取り消しますか？")) void act({ type: "ronCancel" });
+          }}
+          danger
+        />
+      )}
+      {actions?.kind === "callDetail" && (
+        <CallDetailDialog
+          call={actions.call}
+          tile={actions.tile}
+          groups={toGroups(g.arrangement, g.myHand)}
+          deadline={g.deadline}
+          onPick={(tileIds) => act({ type: "callDetail", tileIds })}
+          onCancel={() => act({ type: "callDetail", cancel: true })}
+        />
+      )}
+      {tsumoOpen && turnA && (
+        <TsumoDialog
+          groups={toGroups(g.arrangement, g.myHand)}
+          meldCount={myMelds.length}
+          onClose={() => setTsumoOpen(false)}
+          onConfirm={(ins) => {
+            setTsumoOpen(false);
+            if (ins && g.arrangement) {
+              // ツモ牌を選んだ場所に入れた並びを送ってから宣言する
+              const gs = toGroups(g.arrangement, g.myHand).slice(0, -1);
+              gs[ins.group] = [...gs[ins.group].slice(0, ins.pos), ins.tile, ...gs[ins.group].slice(ins.pos)];
+              const order = gs.flat().map((t) => t.id);
+              const breaks = gs.slice(0, -1).map((x) => x[x.length - 1].id);
+              send("game:arrange", { order, breaks });
+            }
+            void act({ type: "tsumo" });
+          }}
+        />
+      )}
       {g.phase === "vote" && g.vote && <VoteModal g={g} />}
       {g.phase === "result" && g.result && <ResultModal g={g} />}
       {g.phase === "final" && g.final && <FinalModal g={g} />}

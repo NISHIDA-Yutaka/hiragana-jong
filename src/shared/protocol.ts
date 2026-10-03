@@ -21,6 +21,10 @@ export interface RoomSettings {
   calls: boolean;
   /** 投票で否決されたとき：cancel=取り消しのみ / chombo=チョンボ（満貫払い） */
   rejectPenalty: "cancel" | "chombo";
+  /** declare=自己申告（アナログ準拠。いつでも宣言でき、他の人が確認） / assist=アガれる形のときだけボタンが出る */
+  judgeMode: "declare" | "assist";
+  /** 自己申告で、打牌のあとロン・ポン・カンを受け付ける秒数 */
+  callSeconds: 2 | 3 | 5;
 }
 
 export const DEFAULT_SETTINGS: RoomSettings = {
@@ -31,7 +35,9 @@ export const DEFAULT_SETTINGS: RoomSettings = {
   extraTiles: false,
   timer: "normal",
   calls: true,
-  rejectPenalty: "cancel",
+  rejectPenalty: "chombo",
+  judgeMode: "declare",
+  callSeconds: 2,
 };
 
 export const TIMER_SECONDS: Record<TimerPreset, { base: number; bank: number }> = {
@@ -131,6 +137,21 @@ export type ActionsView =
       kan: CallOption[];
       tile: Tile;
       fromSeat: number;
+      /** 自己申告：語の候補は出さず、押したあとで自分で選ぶ */
+      declare?: boolean;
+      canPon?: boolean;
+      canKan?: boolean;
+    }
+  | {
+      /** 自己申告のロン：ロン牌をどの語のどこに入れるか選ぶ */
+      kind: "ronPlace";
+      tile: Tile;
+    }
+  | {
+      /** 自己申告のポン・カン：使う牌と語を選ぶ */
+      kind: "callDetail";
+      call: "pon" | "kan";
+      tile: Tile;
     };
 
 export interface VoteItem {
@@ -138,6 +159,8 @@ export interface VoteItem {
   kind: "word" | "theme" | "sakubun";
   text: string;
   detail?: string;
+  /** 辞書（ルーム辞書を含む）にある語か */
+  known?: boolean;
 }
 
 export interface VoteView {
@@ -185,6 +208,8 @@ export interface HandResultView {
   deltas: number[];
   after: number[];
   note?: string;
+  /** チョンボのとき、宣言した手牌 */
+  shown?: WinGroupView[];
 }
 
 export interface FinalView {
@@ -210,7 +235,10 @@ export interface GameView {
   dealer: number;
   liveRemaining: number;
   turn: number;
-  phase: "play" | "calls" | "vote" | "result" | "final";
+  phase: "play" | "calls" | "claim" | "vote" | "result" | "final";
+  judgeMode: "declare" | "assist";
+  /** 宣言中などのお知らせ */
+  notice: string | null;
   lengthLabel: string;
   myHand: Tile[];
   drawnId: number | null;
@@ -237,5 +265,8 @@ export type GameAction =
   | { type: "kakan"; optionId: number }
   | { type: "sakubun" }
   | { type: "call"; call: "ron" | "pon" | "kan" | "pass"; optionId?: number }
+  | { type: "ronPlace"; group: number; pos: number }
+  | { type: "ronCancel" }
+  | { type: "callDetail"; tileIds?: number[]; cancel?: boolean }
   | { type: "vote"; votes: Record<number, boolean> }
   | { type: "ready" };

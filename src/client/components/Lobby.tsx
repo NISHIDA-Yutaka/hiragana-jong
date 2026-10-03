@@ -112,6 +112,29 @@ export function Lobby() {
                 onChange={(v) => set({ length: v as RoomSettings["length"] })}
               />
             </Row>
+            <Row label="判定">
+              <Seg
+                value={s.judgeMode}
+                options={[
+                  ["declare", "自己申告（アナログ準拠）"],
+                  ["assist", "アシスト（アガれる時だけボタン）"],
+                ]}
+                onChange={(v) => set({ judgeMode: v as RoomSettings["judgeMode"] })}
+              />
+            </Row>
+            {s.judgeMode === "declare" && (
+              <Row label="鳴き受付">
+                <Seg
+                  value={s.callSeconds}
+                  options={[
+                    [2, "2秒"],
+                    [3, "3秒"],
+                    [5, "5秒"],
+                  ]}
+                  onChange={(v) => set({ callSeconds: v as RoomSettings["callSeconds"] })}
+                />
+              </Row>
+            )}
             <Row label="持ち時間">
               <Seg
                 value={s.timer}

@@ -3,6 +3,7 @@ import { FormEvent, PointerEvent as RPointerEvent, useEffect, useMemo, useRef, u
 import { Arrangement, groupIds } from "../../shared/arrange";
 import { charOrder, normalizeInput, Tile as TileT } from "../../shared/tiles";
 import { send, toast } from "../net";
+import { shapeLabel } from "../shape";
 import { Tile } from "./Tile";
 
 interface Props {
@@ -104,19 +105,21 @@ export function Hand({ hand, serverArr, drawnId, locked, discardable, highlight,
       used.add(id);
       picks.push(id);
     }
-    let base = cur;
-    for (const id of picks) base = withoutId(base, id);
-    // 入力済みの組の後ろに置く
+    // 組ごとに組み直す：選んだ牌を元の組から抜き、入力済みの組の後ろに新しい組として置く
+    const groups: number[][] = [];
+    for (const g of groupIds(cur)) {
+      const rest = g.filter((id) => !used.has(id));
+      // 牌を抜かれた入力済みの組は、もう語ではないので入力済みの扱いをやめる
+      if (rest.length < g.length) for (const id of rest) typedIds.current.delete(id);
+      if (rest.length) groups.push(rest);
+    }
     let insertAt = 0;
-    base.order.forEach((id, i) => {
-      if (typedIds.current.has(id) && !used.has(id)) insertAt = i + 1;
+    groups.forEach((g, i) => {
+      if (g.some((id) => typedIds.current.has(id))) insertAt = i + 1;
     });
-    const order = [...base.order.slice(0, insertAt), ...picks, ...base.order.slice(insertAt)];
-    const breaks = new Set(base.breaks);
-    if (insertAt > 0) breaks.add(base.order[insertAt - 1]);
-    if (insertAt < base.order.length) breaks.add(picks[picks.length - 1]);
+    groups.splice(insertAt, 0, picks);
     for (const id of picks) typedIds.current.add(id);
-    commit({ order, breaks: [...breaks] });
+    commit({ order: groups.flat(), breaks: groups.slice(0, -1).map((g) => g[g.length - 1]) });
     setTyped("");
   };
 
@@ -260,30 +263,4 @@ export function Hand({ hand, serverArr, drawnId, locked, discardable, highlight,
       </div>
     </div>
   );
-}
-
-/** 区切りの形（文字数の並び）だけを見た目で知らせる。辞書の判定はしない */
-function shapeLabel(lens: number[], meldCount: number): { text: string; cls: string } {
-  const total = lens.reduce((a, b) => a + b, 0);
-  const need3 = 4 - meldCount;
-  const twos = lens.filter((l) => l === 2).length;
-  const threes = lens.filter((l) => l === 3).length;
-  const text = lens.join("・");
-  const full = 2 + 3 * need3;
-  if (total === full) {
-    if ((twos === 1 && threes === need3 && lens.length === need3 + 1) || (meldCount === 0 && twos === 7 && lens.length === 7)) return { text: `${text}　アガリの形`, cls: "shape-win" };
-    // ツモ牌を別にしている場合：残りがテンパイの形か
-    if (lens[lens.length - 1] === 1 && lens.length > 1) {
-      const r = shapeLabel(lens.slice(0, -1), meldCount);
-      if (r.cls === "shape-tenpai") return { text: `${text}　テンパイの形＋1枚`, cls: "shape-tenpai" };
-    }
-  }
-  if (total === full - 1) {
-    const ones = lens.filter((l) => l === 1).length;
-    const groupsOk = lens.length === need3 + 1;
-    // 2・3・3・3・2（3文字の語が1枚足りない）／3・3・3・3・1（頭が1枚足りない）／七対子の1枚足りない形
-    const tenpai = (groupsOk && twos === 2 && threes === need3 - 1) || (groupsOk && threes === need3 && ones === 1) || (meldCount === 0 && lens.length === 7 && twos === 6 && ones === 1);
-    if (tenpai) return { text: `${text}　テンパイの形`, cls: "shape-tenpai" };
-  }
-  return { text: lens.length > 1 ? text : "語ごとに区切りましょう", cls: "" };
 }

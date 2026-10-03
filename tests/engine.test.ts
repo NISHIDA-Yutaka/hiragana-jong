@@ -128,7 +128,7 @@ function rigWall(h0: string, h1: string, draws: string): string[] {
 }
 
 function makeGame(wall: string[], opts: { myWords?: string[]; settings?: Partial<RoomSettings> } = {}) {
-  const settings: RoomSettings = { ...DEFAULT_SETTINGS, playerCount: 2, timer: "none", ...opts.settings };
+  const settings: RoomSettings = { ...DEFAULT_SETTINGS, playerCount: 2, timer: "none", judgeMode: "assist", ...opts.settings };
   const p1lex = opts.myWords ? lex.extend(opts.myWords.map((word) => ({ word, verified: false }))) : lex;
   const approved: string[] = [];
   const game = new Game({
@@ -168,7 +168,7 @@ function arrangeAs(game: Game, playerId: string, words: string[]) {
   game.setArrangement(playerId, { order, breaks });
 }
 
-describe("対局の進行", () => {
+describe("対局の進行（アシスト）", () => {
   it("並べ方が正しければツモ（天和）できる", () => {
     const { game } = makeGame(rigWall("ねこさくらくるまたぬききつ", "いぬそらやまかさはないすと", "ね"));
     let v = game.viewFor("a");
@@ -259,8 +259,8 @@ describe("対局の進行", () => {
     expect(approved).toEqual(["ほげ"]);
   });
 
-  it("投票で否決されるとアガリは取り消され、手番が続く", () => {
-    const { game } = makeGame(rigWall("ららいぬそやまかはないすそ", "ほさくらくるまたぬききつね", "とげ"), { myWords: ["ほげ"], settings: { extraTiles: true } });
+  it("投票で否決されるとアガリは取り消され、手番が続く（否決時：取り消しのみ）", () => {
+    const { game } = makeGame(rigWall("ららいぬそやまかはないすそ", "ほさくらくるまたぬききつね", "とげ"), { myWords: ["ほげ"], settings: { extraTiles: true, rejectPenalty: "cancel" } });
     arrangeAs(game, "b", ["ほ", "さくら", "くるま", "たぬき", "きつね"]);
     const id = game.viewFor("a").myHand.find((t) => t.ch === "そ")!.id;
     game.act("a", { type: "discard", tileId: id });
@@ -284,5 +284,118 @@ describe("対局の進行", () => {
     expect(after.kyotaku).toBe(1);
     expect(after.seats[0].score).toBe(21);
     expect(after.waits).toContain("ね");
+  });
+});
+
+describe("自己申告", () => {
+  const declare = { judgeMode: "declare" as const };
+
+  it("ツモはいつでも宣言でき、他の人の承認でアガリ", () => {
+    const { game } = makeGame(rigWall("ねこさくらくるまたぬききつ", "いぬそらやまかさはないすと", "ね"), { settings: declare });
+    const v = game.viewFor("a");
+    expect(v.actions?.kind === "turn" && v.actions.canTsumo).toBe(true);
+    // 形になっていなければ受け付けない（チョンボにはしない）
+    expect(game.act("a", { type: "tsumo" })).not.toBeNull();
+    arrangeAs(game, "a", ["ねこ", "さくら", "くるま", "たぬき", "きつね"]);
+    expect(game.act("a", { type: "tsumo" })).toBeNull();
+    const vb = game.viewFor("b");
+    expect(vb.phase).toBe("vote");
+    expect(vb.vote!.items.map((i) => i.text)).toEqual(["ねこ", "さくら", "くるま", "たぬき", "きつね"]);
+    expect(vb.vote!.items.every((i) => i.known)).toBe(true);
+    game.act("b", { type: "vote", votes: {} });
+    expect(game.viewFor("a").result?.kind).toBe("agari");
+  });
+
+  it("否決されるとチョンボ（満貫払い）", () => {
+    const { game } = makeGame(rigWall("ねこさくらくるまたぬききつ", "いぬそらやまかさはないすと", "ね"), { settings: declare });
+    // 「こね」「さらく」など辞書にない並び
+    arrangeAs(game, "a", ["こね", "さらく", "くるま", "たぬき", "きつね"]);
+    game.act("a", { type: "tsumo" });
+    const v = game.viewFor("b");
+    const bad = v.vote!.items.find((i) => i.text === "さらく")!;
+    expect(bad.known).toBe(false);
+    game.act("b", { type: "vote", votes: { [bad.id]: false } });
+    const r = game.viewFor("a").result!;
+    expect(r.kind).toBe("chombo");
+    expect(r.deltas).toEqual([-4, 4]);
+  });
+
+  it("ロンは受付時間に宣言し、ロン牌を入れる位置を自分で選ぶ", () => {
+    const { game } = makeGame(rigWall("ららいぬそやまかはないすそ", "ねこさくくるまたぬききつね", "と"), { settings: declare });
+    arrangeAs(game, "b", ["ねこ", "くるま", "たぬき", "きつね", "さく"]);
+    const id = game.viewFor("a").myHand.find((t) => t.ch === "ら")!.id;
+    game.act("a", { type: "discard", tileId: id });
+    let v = game.viewFor("b");
+    expect(v.actions?.kind === "call" && v.actions.declare).toBe(true);
+    expect(game.act("b", { type: "call", call: "ron" })).toBeNull();
+    v = game.viewFor("b");
+    expect(v.actions?.kind).toBe("ronPlace");
+    expect(game.viewFor("a").notice).toContain("ロン");
+    // 「さく」は5番目の組（index 4）、末尾に入れて「さくら」
+    expect(game.act("b", { type: "ronPlace", group: 4, pos: 2 })).toBeNull();
+    const va = game.viewFor("a");
+    expect(va.phase).toBe("vote");
+    game.act("a", { type: "vote", votes: {} });
+    expect(game.viewFor("a").result?.kind).toBe("agari");
+  });
+
+  it("テンパイでない牌でのロンや形にならない位置は受け付けない／取り消しはチョンボ", () => {
+    const { game } = makeGame(rigWall("ららいぬそやまかはないすそ", "ねこさくくるまたぬききつね", "と"), { settings: declare });
+    arrangeAs(game, "b", ["ねこ", "くるま", "たぬき", "きつね", "さく"]);
+    const id = game.viewFor("a").myHand.find((t) => t.ch === "い")!.id;
+    game.act("a", { type: "discard", tileId: id });
+    game.act("b", { type: "call", call: "ron" });
+    // 「きつね」に入れると4文字になり、アガリの形にならない
+    expect(game.act("b", { type: "ronPlace", group: 3, pos: 0 })).not.toBeNull();
+    expect(game.act("b", { type: "ronCancel" })).toBeNull();
+    expect(game.viewFor("a").result?.kind).toBe("chombo");
+  });
+
+  it("フリテンのロンは確認なしでチョンボ", () => {
+    const { game } = makeGame(rigWall("ららいぬそやまかはないすそ", "ねこさくくるまたぬききつね", "とら"), { settings: declare });
+    game.act("a", { type: "discard", tileId: game.viewFor("a").myHand.find((t) => t.ch === "そ")!.id });
+    game.act("b", { type: "call", call: "pass" });
+    arrangeAs(game, "b", ["ねこ", "くるま", "たぬき", "きつね", "さく"]);
+    game.act("b", { type: "discard", tileId: game.viewFor("b").drawnId! });
+    game.act("a", { type: "call", call: "pass" });
+    game.act("a", { type: "discard", tileId: game.viewFor("a").myHand.find((t) => t.ch === "ら")!.id });
+    game.act("b", { type: "call", call: "ron" });
+    game.act("b", { type: "ronPlace", group: 4, pos: 2 });
+    const r = game.viewFor("a").result!;
+    expect(r.kind).toBe("chombo");
+    expect(r.note).toContain("フリテン");
+  });
+
+  it("ポンは押してから語を選ぶ。辞書にない語ならアガリ放棄", () => {
+    const { game } = makeGame(rigWall("ららいぬそやまかはないすそ", "ねこさくくるまたぬききつと", "と"), { settings: declare });
+    arrangeAs(game, "b", ["さく", "ねこ", "くるま", "たぬき", "きつと"]);
+    const ra = game.viewFor("a").myHand.find((t) => t.ch === "ら")!;
+    game.act("a", { type: "discard", tileId: ra.id });
+    expect(game.act("b", { type: "call", call: "pon" })).toBeNull();
+    const v = game.viewFor("b");
+    expect(v.actions?.kind).toBe("callDetail");
+    const [sa, ku] = v.arrangement!.order;
+    expect(game.act("b", { type: "callDetail", tileIds: [sa, ku, ra.id] })).toBeNull();
+    expect(game.viewFor("b").seats[1].melds[0].word).toBe("さくら");
+
+    // 辞書にない語でポン → 鳴けず、その局はツモもできない
+    const g2 = makeGame(rigWall("ららいぬそやまかはないすそ", "ねこさくくるまたぬききつと", "と"), { settings: declare }).game;
+    arrangeAs(g2, "b", ["さく", "ねこ", "くるま", "たぬき", "きつと"]);
+    const ra2 = g2.viewFor("a").myHand.find((t) => t.ch === "ら")!;
+    g2.act("a", { type: "discard", tileId: ra2.id });
+    g2.act("b", { type: "call", call: "pon" });
+    const o = g2.viewFor("b").arrangement!.order;
+    g2.act("b", { type: "callDetail", tileIds: [ra2.id, o[0], o[1]] });
+    const vb = g2.viewFor("b");
+    expect(vb.seats[1].melds.length).toBe(0);
+    expect(vb.actions?.kind === "turn" && vb.actions.canTsumo).toBe(false);
+  });
+
+  it("リーチはテンパイの確認なしで宣言できる", () => {
+    const { game } = makeGame(rigWall("ねこさくらくるまたぬききつ", "いぬそらやまかさはないすと", "そ"), { settings: declare });
+    const v = game.viewFor("a");
+    if (v.actions?.kind !== "turn") throw new Error("not turn");
+    expect(v.actions.riichiDiscards.length).toBe(14);
+    expect(v.waits).toEqual([]);
   });
 });

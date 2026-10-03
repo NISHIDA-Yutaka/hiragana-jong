@@ -108,6 +108,20 @@ export function ResultModal({ g }: { g: GameView }) {
       <div className={`modal result result-${r.kind}`}>
         <div className="result-title">{r.title}</div>
         {r.note && <div className="result-note">{r.note}</div>}
+        {r.shown && (
+          <div className="win-hand shown-hand">
+            {r.shown.map((g, i) => (
+              <div key={i} className="wgroup">
+                <div className="wtiles">
+                  {g.tiles.map((t) => (
+                    <Tile key={t.id} ch={t.ch} size="md" />
+                  ))}
+                </div>
+                <div className="wword">{g.word}</div>
+              </div>
+            ))}
+          </div>
+        )}
         {r.wins.map((w, i) => (
           <WinBlock key={i} w={w} idx={i} />
         ))}
@@ -195,6 +209,7 @@ export function VoteModal({ g }: { g: GameView }) {
     <div className="modal-back">
       <div className="modal vote">
         <div className="result-title small">{v.title}</div>
+        {v.words.length > 0 && v.items.every((i) => i.kind !== "word" || i.known) && <div className="vote-allknown">すべて辞書にある語です</div>}
         <div className="vote-who">
           <b>{v.claimantName}</b> さんのアガリ
         </div>
@@ -210,7 +225,7 @@ export function VoteModal({ g }: { g: GameView }) {
             <div key={it.id} className="vote-item">
               <div className="vi-text">
                 <b>{it.text}</b>
-                <small>{it.detail}</small>
+                <small className={it.known === true ? "good" : it.known === false ? "bad" : ""}>{it.detail}</small>
               </div>
               {v.canVote && (
                 <div className="vi-btns">
@@ -237,7 +252,7 @@ export function VoteModal({ g }: { g: GameView }) {
             </span>
           )}
         </div>
-        <div className="hint">多数決で決まります（同数は不可、時間切れは承認扱い）。</div>
+        <div className="hint">言葉として認めない語だけ「×」にしてください。多数決で決まります（同数は不可、時間切れは承認扱い）。認められないとチョンボになります。</div>
       </div>
     </div>
   );
