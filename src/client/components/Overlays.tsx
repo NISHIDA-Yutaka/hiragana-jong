@@ -26,7 +26,10 @@ function WinHand({ w }: { w: WinView }) {
         <div key={i} className={`wgroup ${g.meld ? "wgroup-meld" : ""} ${g.head ? "wgroup-head" : ""}`}>
           <div className="wtiles">
             {g.tiles.map((t) => (
-              <Tile key={t.id} ch={t.ch} size={w.form === "sakubun" ? "md" : "lg"} className={w.winTile?.id === t.id ? "win-tile" : ""} />
+              <span key={t.id} className="wt-slot">
+                <Tile ch={t.ch} size={w.form === "sakubun" ? "md" : "lg"} className={w.winTile?.id === t.id ? "win-tile" : ""} />
+                {w.winTile?.id === t.id && <i className="win-tag">{w.fromSeat === null ? "ツモ" : "ロン"}</i>}
+              </span>
             ))}
           </div>
           <div className="wword">
