@@ -540,15 +540,8 @@ export function Table() {
           onClose={() => setTsumoOpen(false)}
           onConfirm={(ins) => {
             setTsumoOpen(false);
-            if (ins && g.arrangement) {
-              // ツモ牌を選んだ場所に入れた並びを送ってから宣言する
-              const gs = toGroups(g.arrangement, g.myHand).slice(0, -1);
-              gs[ins.group] = [...gs[ins.group].slice(0, ins.pos), ins.tile, ...gs[ins.group].slice(ins.pos)];
-              const order = gs.flat().map((t) => t.id);
-              const breaks = gs.slice(0, -1).map((x) => x[x.length - 1].id);
-              send("game:arrange", { order, breaks });
-            }
-            void act({ type: "tsumo" });
+            // ツモ牌を入れる場所はサーバーで入れる（リーチ中は並べ替えを送っても受け付けられないため）
+            void act({ type: "tsumo", place: ins ? { group: ins.group, pos: ins.pos } : undefined });
           }}
         />
       )}

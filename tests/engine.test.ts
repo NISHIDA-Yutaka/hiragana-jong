@@ -408,6 +408,25 @@ describe("自己申告", () => {
     expect(vb.actions?.kind === "turn" && vb.actions.canTsumo).toBe(false);
   });
 
+  it("リーチ中のツモ：離れたツモ牌を頭に入れてアガれる（単騎待ち）", () => {
+    const { game } = makeGame(rigWall("さくらくるまたぬきいなりね", "いぬそらやまかさはないすと", "そへこ"), { settings: declare });
+    arrangeAs(game, "a", ["さくら", "くるま", "たぬき", "いなり", "ね"]);
+    const so = game.viewFor("a").myHand.find((t) => t.ch === "そ")!;
+    expect(game.act("a", { type: "discard", tileId: so.id, riichi: "riichi" })).toBeNull();
+    game.act("b", { type: "call", call: "pass" });
+    game.act("b", { type: "discard", tileId: game.viewFor("b").drawnId! });
+    game.act("a", { type: "call", call: "pass" });
+    const v = game.viewFor("a");
+    expect(v.myHand.find((t) => t.id === v.drawnId)?.ch).toBe("こ");
+    // 並びは「さくら・くるま・たぬき・いなり・ね」＋離れた「こ」。並べ替えはできないので、入れる場所を一緒に送る
+    expect(game.act("a", { type: "tsumo" })).not.toBeNull();
+    expect(game.act("a", { type: "tsumo", place: { group: 4, pos: 1 } })).toBeNull();
+    game.act("b", { type: "vote", votes: {} });
+    const r = game.viewFor("a").result!;
+    expect(r.kind).toBe("agari");
+    expect(r.wins[0].groups.map((x) => x.word)).toContain("ねこ");
+  });
+
   it("リーチはテンパイの確認なしで宣言できる", () => {
     const { game } = makeGame(rigWall("ねこさくらくるまたぬききつ", "いぬそらやまかさはないすと", "そ"), { settings: declare });
     const v = game.viewFor("a");

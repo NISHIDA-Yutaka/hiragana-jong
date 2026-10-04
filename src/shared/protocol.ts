@@ -267,7 +267,8 @@ export interface GameView {
 
 export type GameAction =
   | { type: "discard"; tileId: number; riichi?: "riichi" | "open" }
-  | { type: "tsumo" }
+  /** place：離したツモ牌を、残りの組の group 番目の pos 文字目に入れて宣言する（リーチ中も使える） */
+  | { type: "tsumo"; place?: { group: number; pos: number } }
   | { type: "ankan"; optionId: number }
   | { type: "kakan"; optionId: number }
   /** pos：リーチ中に離したツモ牌を文章の何文字目に入れるか */

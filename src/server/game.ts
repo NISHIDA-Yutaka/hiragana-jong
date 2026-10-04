@@ -1643,7 +1643,19 @@ export class Game {
         if (this.declare) {
           const hp = this.hands[seat];
           if (hp.noAgari) return "この局はアガリ放棄です";
-          const comp = checkComplete(this.handGroups(seat), hp.melds.length, this.loose(seat));
+          let groups = this.handGroups(seat);
+          if (a.place) {
+            // 離したツモ牌を選んだ場所に入れる（リーチ中は並べ替えできないので、サーバーで入れる）
+            const last = groups[groups.length - 1];
+            const rest = groups.slice(0, -1);
+            const g = rest[a.place.group];
+            const pos = a.place.pos;
+            if (!last || last.ids.length !== 1 || !g || !Number.isInteger(pos) || pos < 0 || pos > g.ids.length) return "ツモ牌を入れる場所が正しくありません";
+            const chars = [...g.word];
+            rest[a.place.group] = { word: [...chars.slice(0, pos), last.word, ...chars.slice(pos)].join(""), ids: [...g.ids.slice(0, pos), last.ids[0], ...g.ids.slice(pos)] };
+            groups = rest;
+          }
+          const comp = checkComplete(groups, hp.melds.length, this.loose(seat));
           if (!comp) return "アガリの形（2文字×1＋3文字×4、または2文字×7）に並べてください";
           this.clearTimer("turn");
           this.consumeBank(seat, this.turnStartedAt);
