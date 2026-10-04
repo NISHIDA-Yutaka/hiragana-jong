@@ -173,11 +173,15 @@ export function Table() {
     <div className="table-root">
       <div className="stage" style={{ width: W, height: H, transform: `translate(-50%, -50%) scale(${scale})` }}>
         <div className="felt" />
-        <div className="table-square">
-          <CenterBox g={g} mySeat={me} />
-          {g.seats.map((s) => (
-            <SeatZone key={s.seat} s={s} pos={posFor(s.seat, me, g.n)} isMe={!spectator && s.seat === me} lastDiscardId={g.lastDiscard?.seat === s.seat ? g.lastDiscard.tileId : null} isTurn={g.turn === s.seat} />
-          ))}
+        <div className="table-3d">
+          <div className="table-square">
+            <CenterBox g={g} mySeat={me} />
+            {g.seats.map((s) => (
+              <SeatZone key={s.seat} s={s} pos={posFor(s.seat, me, g.n)} isMe={!spectator && s.seat === me} lastDiscardId={g.lastDiscard?.seat === s.seat ? g.lastDiscard.tileId : null} isTurn={g.turn === s.seat} />
+            ))}
+          </div>
+        </div>
+        <div className="callout-layer">
           {callouts.map((c) => (
             <div key={c.key} className={`callout callout-${c.pos} callout-${c.kind}`}>
               <span className="co-text">{c.text}</span>

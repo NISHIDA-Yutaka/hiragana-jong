@@ -114,6 +114,13 @@ select:focus {
   --th: 51px;
   --tf: 29px;
   --td: 4px;
+  /* 厚みの向き（--dx, --dy）。卓を奥に倒したとき、どの席の牌も手前に厚みが見えるよう席ごとに変える */
+  --sx1: calc(var(--td) * var(--dx, 0));
+  --sy1: calc(var(--td) * var(--dy, 1));
+  --sx2: calc((var(--td) + 1px) * var(--dx, 0));
+  --sy2: calc((var(--td) + 1px) * var(--dy, 1));
+  --sx3: calc((var(--td) + 3px) * var(--dx, 0));
+  --sy3: calc((var(--td) + 3px) * var(--dy, 1));
   position: relative;
   width: var(--tw);
   height: var(--th);
@@ -123,9 +130,9 @@ select:focus {
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.9),
     inset 0 0 0 1px rgba(80, 60, 20, 0.12),
-    0 var(--td) 0 0 var(--tile-edge),
-    0 calc(var(--td) + 1px) 0 0 var(--tile-edge-dark),
-    0 calc(var(--td) + 3px) 7px rgba(0, 0, 0, 0.45);
+    var(--sx1) var(--sy1) 0 0 var(--tile-edge),
+    var(--sx2) var(--sy2) 0 0 var(--tile-edge-dark),
+    var(--sx3) var(--sy3) 7px rgba(0, 0, 0, 0.45);
   margin-bottom: calc(var(--td) + 1px);
   display: flex;
   align-items: center;
@@ -187,9 +194,9 @@ select:focus {
   box-shadow:
     inset 0 0 0 2px rgba(255, 255, 255, 0.22),
     inset 0 -2px 0 rgba(120, 70, 10, 0.25),
-    0 var(--td) 0 0 #efe6cf,
-    0 calc(var(--td) + 1px) 0 0 #c9bd9d,
-    0 calc(var(--td) + 3px) 6px rgba(0, 0, 0, 0.45);
+    var(--sx1) var(--sy1) 0 0 #efe6cf,
+    var(--sx2) var(--sy2) 0 0 #c9bd9d,
+    var(--sx3) var(--sy3) 6px rgba(0, 0, 0, 0.45);
 }
 
 /* ------------------------------------------------------------ タイトル */
@@ -880,8 +887,8 @@ fieldset:disabled .seg button:not(.on) {
 .dtile.last {
   box-shadow:
     inset 0 0 0 2px rgba(240, 160, 40, 0.9),
-    0 var(--td) 0 0 var(--tile-edge),
-    0 calc(var(--td) + 1px) 0 0 var(--tile-edge-dark),
+    var(--sx1) var(--sy1) 0 0 var(--tile-edge),
+    var(--sx2) var(--sy2) 0 0 var(--tile-edge-dark),
     0 0 12px 3px rgba(255, 190, 70, 0.7);
 }
 .last-mark {
@@ -984,9 +991,9 @@ fieldset:disabled .seg button:not(.on) {
 .called-in {
   box-shadow:
     inset 0 -3px 0 0 #e0a73a,
-    0 var(--td) 0 0 var(--tile-edge),
-    0 calc(var(--td) + 1px) 0 0 var(--tile-edge-dark),
-    0 calc(var(--td) + 3px) 6px rgba(0, 0, 0, 0.45);
+    var(--sx1) var(--sy1) 0 0 var(--tile-edge),
+    var(--sx2) var(--sy2) 0 0 var(--tile-edge-dark),
+    var(--sx3) var(--sy3) 6px rgba(0, 0, 0, 0.45);
 }
 
 /* 名札 */
@@ -1219,8 +1226,8 @@ fieldset:disabled .seg button:not(.on) {
   transform: translateY(-20px);
   box-shadow:
     inset 0 0 0 2px #f0a52c,
-    0 var(--td) 0 0 var(--tile-edge),
-    0 calc(var(--td) + 1px) 0 0 var(--tile-edge-dark),
+    var(--sx1) var(--sy1) 0 0 var(--tile-edge),
+    var(--sx2) var(--sy2) 0 0 var(--tile-edge-dark),
     0 0 18px 4px rgba(255, 190, 70, 0.6);
 }
 .htile.dragging {
@@ -1236,7 +1243,7 @@ fieldset:disabled .seg button:not(.on) {
 .htile.hl {
   box-shadow:
     inset 0 0 0 3px #ffcf4d,
-    0 var(--td) 0 0 var(--tile-edge),
+    var(--sx1) var(--sy1) 0 0 var(--tile-edge),
     0 0 16px 3px rgba(255, 210, 90, 0.75);
 }
 .htile.no-trans {
@@ -1704,7 +1711,7 @@ fieldset:disabled .seg button:not(.on) {
 .win-tile {
   box-shadow:
     inset 0 0 0 3px #ff7a3c,
-    0 var(--td) 0 0 var(--tile-edge),
+    var(--sx1) var(--sy1) 0 0 var(--tile-edge),
     0 0 16px 4px rgba(255, 120, 60, 0.7);
 }
 .yaku-list {
@@ -2231,4 +2238,109 @@ fieldset:disabled .seg button:not(.on) {
 }
 .win-hand {
   padding-top: 8px;
+}
+
+/* ------------------------------------------------------------ 奥行き（パース） */
+/* 卓の面だけを奥に倒す。自分の手牌・ボタン・名札は手前に平らなまま（雀魂と同じ構図） */
+.stage .felt {
+  background:
+    radial-gradient(ellipse at 50% 30%, rgba(40, 90, 70, 0.35), transparent 60%),
+    linear-gradient(#0a1714, #030807);
+}
+.table-3d {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  perspective: 1400px;
+  perspective-origin: 50% 0%;
+  pointer-events: none;
+}
+.table-3d .table-square {
+  left: 330px;
+  top: -95px;
+  width: 940px;
+  height: 940px;
+  transform: rotateX(34deg) scale(1.12);
+  transform-origin: 50% 66%;
+  transform-style: preserve-3d;
+  border-radius: 56px;
+  background:
+    radial-gradient(ellipse at 50% 50%, rgba(80, 180, 135, 0.28), transparent 62%),
+    radial-gradient(ellipse at 50% 50%, #157052 0%, #0d4a37 60%, #08311f 100%);
+  box-shadow:
+    inset 0 0 120px rgba(0, 0, 0, 0.35),
+    0 0 0 16px #4a2e1a,
+    0 0 0 19px #2a180c,
+    0 60px 120px rgba(0, 0, 0, 0.7);
+}
+.table-3d .table-square::before {
+  inset: 56px;
+  border-color: rgba(231, 196, 108, 0.18);
+}
+.table-3d .zone,
+.table-3d .opp-hand {
+  transform-style: preserve-3d;
+}
+.table-3d .opp-hand {
+  top: 386px;
+  left: -320px;
+  width: 640px;
+}
+/* 他家の手牌は卓の上に立てる。横の席は真横からだと薄く見えるので卓側へ少し傾けて背を見せる */
+.table-3d .backs {
+  transform-origin: 50% 100%;
+  transform: rotateX(-90deg);
+}
+.table-3d .zone-left .backs,
+.table-3d .zone-right .backs {
+  transform: rotateX(-58deg);
+}
+.table-3d .backs .tile {
+  --tw: 36px;
+  --th: 48px;
+  margin-bottom: 0;
+  box-shadow:
+    inset 0 0 0 2px rgba(255, 255, 255, 0.22),
+    inset 0 -3px 0 rgba(120, 70, 10, 0.3),
+    0 0 0 1px rgba(80, 45, 5, 0.5);
+}
+/* 厚みが画面の手前（下）に見えるよう、席の向きに合わせる */
+.zone-top .tile {
+  --dx: 0;
+  --dy: -1;
+}
+.zone-left .tile {
+  --dx: 1;
+  --dy: 0;
+}
+.zone-right .tile {
+  --dx: -1;
+  --dy: 0;
+}
+/* 発声の演出は平らな層に置き、倒した卓の上の位置に合わせる */
+.callout-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  pointer-events: none;
+}
+.callout-layer .callout-bottom {
+  left: 800px;
+  top: 560px;
+}
+.callout-layer .callout-top {
+  left: 800px;
+  top: 150px;
+}
+.callout-layer .callout-left {
+  left: 430px;
+  top: 360px;
+}
+.callout-layer .callout-right {
+  left: 1170px;
+  top: 360px;
+}
+.callout-layer .callout-center {
+  left: 800px;
+  top: 360px;
 }
