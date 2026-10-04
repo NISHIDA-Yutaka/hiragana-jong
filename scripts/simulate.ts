@@ -20,6 +20,8 @@ if (recordFile) writeFileSync(recordFile, "");
 const settings: RoomSettings = { ...DEFAULT_SETTINGS, length, playerCount: n, timer: "none", extraTiles: process.env.EXTRA === "1" };
 const cfg = { level: settings.dictLevel, seion: settings.seion, extraTiles: settings.extraTiles };
 const base = getBaseLexicon(cfg);
+// 配牌直後にツモれる山の枚数（王牌14枚を除く）
+const liveAtStart = (settings.extraTiles ? 166 : 136) - 13 * n - 14;
 
 const turns: number[] = [];
 const stats = { hands: 0, tsumo: 0, ron: 0, draw: 0, abort: 0, yaku: new Map<string, number>(), hanHist: new Map<string, number>() };
@@ -37,7 +39,7 @@ async function runOne(gi: number) {
           const v = g.viewFor(null);
           if (v.result && v.result !== lastResult) {
             lastResult = v.result;
-            stats.hands++; turns.push(70 - v.liveRemaining);
+            stats.hands++; turns.push(liveAtStart - v.liveRemaining);
             if (v.result.kind === "agari") {
               for (const w of v.result.wins) {
                 if (w.fromSeat === null) stats.tsumo++;
