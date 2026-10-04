@@ -46,8 +46,10 @@ interface HP {
   arr: Arrangement;
   riichi: null | { open: boolean; double: boolean; accepted: boolean };
   ippatsu: boolean;
-  tempFuriten: boolean;
-  riichiFuriten: boolean;
+  /** 同巡内フリテン：見逃した牌の文字（自分の次のツモまで） */
+  tempFuriten: Set<string>;
+  /** リーチ後フリテン：リーチ後に見逃した牌の文字（その局が終わるまで） */
+  riichiFuriten: Set<string>;
   /** ポン・明カン・加カンをした（門前でない・ロン不可） */
   called: boolean;
   drawnId: number | null;
@@ -361,8 +363,8 @@ export class Game {
       arr: { order: [], breaks: [] },
       riichi: null,
       ippatsu: false,
-      tempFuriten: false,
-      riichiFuriten: false,
+      tempFuriten: new Set(),
+      riichiFuriten: new Set(),
       called: false,
       drawnId: null,
       bank,
@@ -420,7 +422,7 @@ export class Game {
       const t = this.wall[this.drawPos++];
       hp.hand.push(t);
       hp.drawnId = t.id;
-      hp.tempFuriten = false;
+      hp.tempFuriten.clear();
       this.emit("draw", seat);
     } else if (kind === "rinshan") {
       for (let i = 0; i < count; i++) {
@@ -428,7 +430,7 @@ export class Game {
         hp.hand.push(t);
         hp.drawnId = t.id;
       }
-      hp.tempFuriten = false;
+      hp.tempFuriten.clear();
     } else if (kind === "afterCall") {
       hp.drawnId = null;
     }
@@ -654,10 +656,21 @@ export class Game {
     return null;
   }
 
-  private discardFuriten(seat: number, groups: { word: string; ids: number[] }[]) {
+  /**
+   * フリテン：アガリ牌と同じ文字を自分で捨てている、または見逃している。
+   * ルールブックは「待ちのどれかを捨てていたら」だが、辞書の語が多く1文字の単騎で40種類も待ちがあるため、
+   * 遊ぶ人が把握できる「同じ文字」に絞っている
+   */
+  private isFuriten(seat: number, ch: string) {
     const hp = this.hands[seat];
-    const waits = this.waitsOfGroups(seat, groups);
-    return hp.discards.some((d) => waits.includes(d.tile.ch));
+    return hp.discards.some((d) => d.tile.ch === ch) || hp.tempFuriten.has(ch) || hp.riichiFuriten.has(ch);
+  }
+
+  /** ロンできた牌を見逃した */
+  private missRon(seat: number, ch: string) {
+    const hp = this.hands[seat];
+    hp.tempFuriten.add(ch);
+    if (hp.riichi) hp.riichiFuriten.add(ch);
   }
 
   private openCallWindow() {
@@ -693,10 +706,7 @@ export class Game {
       const p = this.players[s];
       // ボットはロンできるときだけ、切断中の人は参加しない
       if (p.isBot ? !cs.ron : !p.connected) {
-        if (cs.ron || cs.ronMissed) {
-          hp.tempFuriten = true;
-          if (hp.riichi) hp.riichiFuriten = true;
-        }
+        if (cs.ron || cs.ronMissed) this.missRon(s, d.tile.ch);
         continue;
       }
       cs.pon = [];
@@ -738,7 +748,7 @@ export class Game {
     if (!hp.called) {
       const comp = completeWith(groups, tile, hp.melds.length, chk);
       if (comp) {
-        const furiten = hp.tempFuriten || hp.riichiFuriten || this.discardFuriten(seat, groups);
+        const furiten = this.isFuriten(seat, tile.ch);
         const y = this.yakuFor(this.claimFor(seat, this.lastDiscard!.seat, tile, comp), true);
         if (y.mainHan >= 1) {
           if (furiten) ronMissed = true;
@@ -766,9 +776,9 @@ export class Game {
       }
     }
     if (keep) return { seat, ron, ronMissed, pon, kan, response: null, startedAt: Date.now(), canPon: false, canKan: false };
-    if (ronMissed && hp.riichi) hp.riichiFuriten = true;
+    if (ronMissed && hp.riichi) hp.riichiFuriten.add(tile.ch);
     if (!ron && pon.length === 0 && kan.length === 0) {
-      if (ronMissed) hp.tempFuriten = true;
+      if (ronMissed) hp.tempFuriten.add(tile.ch);
       return null;
     }
     return { seat, ron, ronMissed, pon, kan, response: null, startedAt: Date.now(), canPon: false, canKan: false };
@@ -816,10 +826,7 @@ export class Game {
     const d = this.lastDiscard!;
     const order = [...this.calls.values()].sort((a, b) => ((a.seat - d.seat + this.n) % this.n) - ((b.seat - d.seat + this.n) % this.n));
     for (const c of order) {
-      if (c.ron && c.response?.call !== "ron") {
-        this.hands[c.seat].tempFuriten = true;
-        if (this.hands[c.seat].riichi) this.hands[c.seat].riichiFuriten = true;
-      }
+      if (c.ron && c.response?.call !== "ron") this.missRon(c.seat, d.tile.ch);
     }
     const rons = order.filter((c) => c.response?.call === "ron");
     if (rons.length > 0) {
@@ -966,8 +973,7 @@ export class Game {
       if (pr.sentence) {
         // 作文の待ちは機械では分からないので、捨て牌や見逃しによるフリテンはほぼ確かめられない
         const c = this.claimFor(pr.seat, d.seat, d.tile, null, pr.sentence);
-        const hp = this.hands[pr.seat];
-        if (hp.tempFuriten || hp.riichiFuriten) c.invalid = "フリテン";
+        if (this.isFuriten(pr.seat, d.tile.ch)) c.invalid = `フリテン（「${d.tile.ch}」を捨てているか見逃している）`;
         return c;
       }
       if (!pr.comp) {
@@ -977,8 +983,7 @@ export class Game {
         return c;
       }
       const c = this.claimFor(pr.seat, d.seat, d.tile, pr.comp);
-      const hp = this.hands[pr.seat];
-      if (hp.tempFuriten || hp.riichiFuriten || this.discardFuriten(pr.seat, this.handGroups(pr.seat))) c.invalid = "フリテン";
+      if (this.isFuriten(pr.seat, d.tile.ch)) c.invalid = `フリテン（「${d.tile.ch}」を捨てているか見逃している）`;
       return c;
     });
     this.pendingRon = [];
@@ -1302,7 +1307,7 @@ export class Game {
       this.armActionTimer(seat, "turn", () => this.autoDiscard(seat));
       if (this.players[seat].isBot) this.setTimer("bot", this.botDelay(), () => this.botTurn(seat, true));
     } else {
-      for (const r of rejected) this.hands[r.claim.seat].tempFuriten = true;
+      for (const r of rejected) if (r.claim.tile) this.hands[r.claim.seat].tempFuriten.add(r.claim.tile.ch);
       this.finalizeDiscard();
     }
   }

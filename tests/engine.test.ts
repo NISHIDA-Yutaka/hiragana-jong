@@ -383,6 +383,23 @@ describe("自己申告", () => {
     expect(r.note).toContain("フリテン");
   });
 
+  it("フリテンは同じ文字だけ：別の待ちの文字を捨てていてもロンできる", () => {
+    // B は「い」の単騎（いぬ・いす・あい が待ち）。「す」を捨てたあと「ぬ」でロンする
+    const { game } = makeGame(rigWall("ぬやまかはなそほもめれろわ", "くるまたぬききつねさくらい", "そすへ"), { settings: declare });
+    arrangeAs(game, "b", ["くるま", "たぬき", "きつね", "さくら", "い"]);
+    game.act("a", { type: "discard", tileId: game.viewFor("a").myHand.find((t) => t.ch === "そ")!.id });
+    game.act("b", { type: "call", call: "pass" });
+    expect(game.viewFor("b").myHand.find((t) => t.id === game.viewFor("b").drawnId)?.ch).toBe("す");
+    game.act("b", { type: "discard", tileId: game.viewFor("b").drawnId! });
+    game.act("a", { type: "call", call: "pass" });
+    game.act("a", { type: "discard", tileId: game.viewFor("a").myHand.find((t) => t.ch === "ぬ")!.id });
+    expect(game.act("b", { type: "call", call: "ron" })).toBeNull();
+    expect(game.act("b", { type: "ronPlace", group: 4, pos: 1 })).toBeNull();
+    expect(game.viewFor("a").phase).toBe("vote");
+    game.act("a", { type: "vote", votes: {} });
+    expect(game.viewFor("a").result?.kind).toBe("agari");
+  });
+
   it("ポンは押してから語を選ぶ。辞書にない語ならアガリ放棄", () => {
     const { game } = makeGame(rigWall("ららいぬそやまかはないすそ", "ねこさくくるまたぬききつと", "と"), { settings: declare });
     arrangeAs(game, "b", ["さく", "ねこ", "くるま", "たぬき", "きつと"]);
