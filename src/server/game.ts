@@ -75,6 +75,8 @@ interface Claim {
   form: "standard" | "chiitoi" | "sakubun";
   completed: Completed | null;
   sentence?: string;
+  /** 作文の牌の並び（アガリ牌を入れた後） */
+  sentenceIds?: number[];
   theme: { name: string; pure: boolean } | null;
   items: VoteItem[];
   ippatsu: boolean;
@@ -84,6 +86,20 @@ interface Claim {
   invalid?: string;
 }
 
+interface PendingRon {
+  seat: number;
+  comp: Completed | null;
+  sentence?: Sentence;
+  startedAt: number;
+  cancelled: boolean;
+}
+
+/** 作文：文章と牌の並び */
+interface Sentence {
+  text: string;
+  ids: number[];
+}
+
 interface VoteState {
   claims: Claim[];
   voters: number[];
@@ -91,6 +107,8 @@ interface VoteState {
   deadline: number | null;
   /** ロンの投票か（否決時の再開方法が違う） */
   ron: boolean;
+  /** 流局時の作文テンパイの確認なら、確認前のテンパイ */
+  tenpai?: boolean[];
 }
 
 export interface GameHooks {
@@ -131,7 +149,7 @@ export class Game {
   private riipaiDone = new Set<number>();
   private riipaiDeadline: number | null = null;
   /** 自己申告のロン宣言（ロン牌を入れる位置を選んでいる） */
-  private pendingRon: { seat: number; comp: Completed | null; startedAt: number; cancelled: boolean }[] = [];
+  private pendingRon: PendingRon[] = [];
   /** 自己申告のポン・カン（語を選んでいる） */
   private callDetail: { seat: number; call: "pon" | "kan"; startedAt: number } | null = null;
   private windowDeadline: number | null = null;
@@ -416,7 +434,7 @@ export class Game {
     this.turnStartedAt = Date.now();
     this.armActionTimer(seat, "turn", () => this.autoDiscard(seat));
     if (this.players[seat].isBot) this.setTimer("bot", this.botDelay(), () => this.botTurn(seat));
-    else if (hp.riichi && !this.turnActions.canTsumo && this.turnActions.ankan.length === 0) {
+    else if (hp.riichi && !this.turnActions.canTsumo && !this.turnActions.canSakubun && this.turnActions.ankan.length === 0) {
       // リーチ後はアガれない牌なら自動でツモ切り
       this.setTimer("turn", this.fast ? 0 : 900, () => this.autoDiscard(seat));
     }
@@ -443,6 +461,33 @@ export class Game {
   private handGroups(seat: number, arr?: Arrangement, hand?: Tile[]) {
     const hp = this.hands[seat];
     return groupsWithChars(arr ?? hp.arr, hand ?? hp.hand);
+  }
+
+  /**
+   * 作文の形：鳴きなしで、手牌を区切らずに1つの組にしている。
+   * 14枚なら最後に1枚だけ離した形も可（その牌を文章のどこかに入れて宣言する）
+   */
+  private sentenceShape(seat: number): { ids: number[]; extra: number | null } | null {
+    const hp = this.hands[seat];
+    if (hp.melds.length > 0) return null;
+    const groups = this.handGroups(seat);
+    if (hp.hand.length === 13) return groups.length === 1 ? { ids: groups[0].ids, extra: null } : null;
+    if (hp.hand.length !== 14) return null;
+    if (groups.length === 1) return { ids: groups[0].ids, extra: null };
+    if (groups.length === 2 && groups[1].ids.length === 1) return { ids: groups[0].ids, extra: groups[1].ids[0] };
+    return null;
+  }
+
+  /** 作文ボタンを出すか。ツモ牌を離した形はリーチ中（並べ替えできない）だけ */
+  private canSakubun(seat: number) {
+    const sh = this.hands[seat].hand.length === 14 ? this.sentenceShape(seat) : null;
+    return !!sh && (sh.extra === null || !!this.hands[seat].riichi);
+  }
+
+  private sentenceOf(seat: number, ids: number[], extra?: Tile): Sentence {
+    const byId = new Map(this.hands[seat].hand.map((t) => [t.id, t]));
+    if (extra) byId.set(extra.id, extra);
+    return { text: ids.map((id) => byId.get(id)!.ch).join(""), ids };
   }
 
   /** 並べた13-3m枚の待ち（牌の種類） */
@@ -493,7 +538,7 @@ export class Game {
       out.canTsumo = y.mainHan >= 1;
     }
     // 作文：14牌を区切らずに1つの組として並べたとき
-    out.canSakubun = hp.melds.length === 0 && hp.hand.length === 14 && hp.arr.breaks.length === 0;
+    out.canSakubun = this.canSakubun(seat);
     const groups = this.handGroups(seat);
     // 暗カン：4文字以上の語として並べた組
     if (!locked && this.totalKans() < 4) {
@@ -537,7 +582,7 @@ export class Game {
   private declareTurnActions(seat: number, out: Extract<ActionsView, { kind: "turn" }>) {
     const hp = this.hands[seat];
     out.canTsumo = !hp.noAgari;
-    out.canSakubun = !hp.noAgari && hp.melds.length === 0 && hp.hand.length === 14 && hp.arr.breaks.length === 0;
+    out.canSakubun = !hp.noAgari && this.canSakubun(seat);
     const groups = this.handGroups(seat);
     if (!out.locked && this.totalKans() < 4) {
       let id = 0;
@@ -853,29 +898,43 @@ export class Game {
     this.pendingRon = seats.map((seat) => ({ seat, comp: null, startedAt: now, cancelled: false }));
     for (const s of seats) this.emit("ron", s);
     for (const pr of this.pendingRon) {
-      if (this.players[pr.seat].isBot || !this.players[pr.seat].connected) pr.comp = this.autoPlace(pr.seat);
+      if (this.players[pr.seat].isBot || !this.players[pr.seat].connected) this.autoPlace(pr);
     }
     this.setTimer("place", this.fast ? 0 : 30000, () => {
-      for (const pr of this.pendingRon) if (!pr.comp && !pr.cancelled) pr.comp = this.autoPlace(pr.seat);
+      for (const pr of this.pendingRon) if (!this.ronPlaced(pr)) this.autoPlace(pr);
       this.judgeRons();
     });
-    if (this.pendingRon.every((p) => p.comp || p.cancelled)) this.judgeRons();
+    if (this.pendingRon.every((p) => this.ronPlaced(p) || p.cancelled)) this.judgeRons();
   }
 
-  /** 時間切れなど：辞書で一番それらしい位置に入れる（形にならなければ null） */
-  private autoPlace(seat: number): Completed | null {
-    const hp = this.hands[seat];
-    return completeWith(this.handGroups(seat), this.lastDiscard!.tile, hp.melds.length, this.loose(seat));
+  private ronPlaced(pr: { comp: Completed | null; sentence?: Sentence; cancelled: boolean }) {
+    return !!pr.comp || !!pr.sentence || pr.cancelled;
+  }
+
+  /** 時間切れなど：辞書で一番それらしい位置に入れる。作文の形なら末尾に入れる */
+  private autoPlace(pr: PendingRon) {
+    const hp = this.hands[pr.seat];
+    const t = this.lastDiscard!.tile;
+    const sh = this.sentenceShape(pr.seat);
+    if (sh && sh.extra === null) pr.sentence = this.sentenceOf(pr.seat, [...sh.ids, t.id], t);
+    else pr.comp = completeWith(this.handGroups(pr.seat), t, hp.melds.length, this.loose(pr.seat));
   }
 
   private placeRon(seat: number, group: number, pos: number): string | null {
     const pr = this.pendingRon.find((p) => p.seat === seat);
-    if (this.step !== "claim" || !pr || pr.comp || pr.cancelled) return "ロンの宣言中ではありません";
+    if (this.step !== "claim" || !pr || this.ronPlaced(pr)) return "ロンの宣言中ではありません";
     const hp = this.hands[seat];
     const groups = this.handGroups(seat);
     const g = groups[group];
     if (!g || pos < 0 || pos > g.ids.length) return "位置が正しくありません";
     const t = this.lastDiscard!.tile;
+    // 作文：区切らずに並べた13枚の文章に入れる
+    const sh = this.sentenceShape(seat);
+    if (sh && sh.extra === null) {
+      pr.sentence = this.sentenceOf(seat, [...g.ids.slice(0, pos), t.id, ...g.ids.slice(pos)], t);
+      if (this.pendingRon.every((p) => this.ronPlaced(p))) this.judgeRons();
+      return null;
+    }
     const chars = [...g.word];
     const ng = groups.map((x, i) =>
       i === group ? { word: [...chars.slice(0, pos), t.ch, ...chars.slice(pos)].join(""), ids: [...g.ids.slice(0, pos), t.id, ...g.ids.slice(pos)] } : x,
@@ -883,15 +942,15 @@ export class Game {
     const comp = checkComplete(ng, hp.melds.length, this.loose(seat));
     if (!comp) return "アガリの形（2文字×1＋3文字×4、または2文字×7）になりません";
     pr.comp = comp;
-    if (this.pendingRon.every((p) => p.comp || p.cancelled)) this.judgeRons();
+    if (this.pendingRon.every((p) => this.ronPlaced(p))) this.judgeRons();
     return null;
   }
 
   private cancelRon(seat: number): string | null {
     const pr = this.pendingRon.find((p) => p.seat === seat);
-    if (this.step !== "claim" || !pr || pr.comp) return "取り消せません";
+    if (this.step !== "claim" || !pr || this.ronPlaced(pr)) return "取り消せません";
     pr.cancelled = true;
-    if (this.pendingRon.every((p) => p.comp || p.cancelled)) this.judgeRons();
+    if (this.pendingRon.every((p) => this.ronPlaced(p))) this.judgeRons();
     return null;
   }
 
@@ -901,6 +960,13 @@ export class Game {
     this.clearTimer("place");
     const d = this.lastDiscard!;
     const claims = this.pendingRon.map((pr) => {
+      if (pr.sentence) {
+        // 作文の待ちは機械では分からないので、捨て牌や見逃しによるフリテンはほぼ確かめられない
+        const c = this.claimFor(pr.seat, d.seat, d.tile, null, pr.sentence);
+        const hp = this.hands[pr.seat];
+        if (hp.tempFuriten || hp.riichiFuriten) c.invalid = "フリテン";
+        return c;
+      }
       if (!pr.comp) {
         const c = this.claimFor(pr.seat, d.seat, d.tile, { form: "standard", hand: [], unverified: [] });
         c.items = [];
@@ -1038,14 +1104,14 @@ export class Game {
 
   // ------------------------------------------------------------------ アガリ
 
-  private claimFor(seat: number, from: number | null, tile: Tile | null, comp: Completed | null, sentence?: string): Claim {
+  private claimFor(seat: number, from: number | null, tile: Tile | null, comp: Completed | null, sentence?: Sentence): Claim {
     const hp = this.hands[seat];
     const isDealer = seat === this.dealer;
     const form = sentence !== undefined ? "sakubun" : comp!.form;
     const theme = form === "standard" ? this.hooks.theme(this.players[seat].id) : null;
     const items: VoteItem[] = [];
     let iid = 0;
-    if (form === "sakubun") items.push({ id: iid++, kind: "sakubun", text: sentence!, detail: "14牌で1つの文章になっていますか？" });
+    if (form === "sakubun") items.push({ id: iid++, kind: "sakubun", text: sentence!.text, detail: "14牌で1つの文章になっていますか？" });
     else if (this.declare) {
       const lx = this.lex(seat);
       const words = [...comp!.hand.map((g) => g.word), ...hp.melds.map((m) => m.word)];
@@ -1063,7 +1129,8 @@ export class Game {
       tile,
       form,
       completed: comp,
-      sentence,
+      sentence: sentence?.text,
+      sentenceIds: sentence?.ids,
       theme,
       items,
       ippatsu: hp.ippatsu,
@@ -1078,7 +1145,7 @@ export class Game {
     if (claim.tile) byId.set(claim.tile.id, claim.tile);
     const handGroups =
       claim.form === "sakubun"
-        ? [{ word: claim.sentence!, tiles: this.handGroups(claim.seat).flatMap((g) => g.ids.map((id) => byId.get(id)!)), meld: null, head: false }]
+        ? [{ word: claim.sentence!, tiles: (claim.sentenceIds ?? this.handGroups(claim.seat).flatMap((g) => g.ids)).map((id) => byId.get(id)!), meld: null, head: false }]
         : claim.completed!.hand.map((g) => ({ word: g.word, tiles: g.ids.map((id) => byId.get(id)!), meld: null as MeldType | null, head: claim.completed!.form === "standard" && [...g.word].length === 2 }));
     const meldGroups = hp.melds.map((m) => ({ word: m.word, tiles: m.tiles, meld: m.type as MeldType | null, head: false }));
     return [...handGroups, ...meldGroups];
@@ -1175,6 +1242,12 @@ export class Game {
       return { claim, approved };
     });
     this.vote = null;
+    if (v.tenpai) {
+      const tenpai = [...v.tenpai];
+      for (const r of results) tenpai[r.claim.seat] = r.claim.items.every((i) => r.approved.has(i.id));
+      this.settleDraw(tenpai);
+      return;
+    }
     this.applyClaims(results);
   }
 
@@ -1290,8 +1363,35 @@ export class Game {
   }
 
   private exhaustiveDraw() {
-    const before = this.players.map((p) => p.score);
     const tenpai = this.players.map((_, s) => this.waitsOfGroups(s, this.handGroups(s)).length > 0);
+    // リーチして区切らずに並べている人は作文待ち。あと1牌で文章になるかを他の人が確認する
+    const claims: Claim[] = [];
+    this.players.forEach((_, s) => {
+      const sh = this.sentenceShape(s);
+      if (tenpai[s] || !this.hands[s].riichi?.accepted || !sh || sh.extra !== null) return;
+      const c = this.claimFor(s, null, null, null, this.sentenceOf(s, sh.ids));
+      c.items[0].detail = "あと1牌で文章になりますか？";
+      claims.push(c);
+    });
+    const voters = this.players.map((_, i) => i).filter((s) => !claims.some((c) => c.seat === s) && (this.players[s].isBot || this.players[s].connected));
+    if (claims.length > 0 && voters.length > 0) {
+      this.step = "vote";
+      this.vote = { claims, voters, votes: new Map(), deadline: this.fast ? null : Date.now() + 45000, ron: false, tenpai };
+      this.emit("vote", claims[0].seat);
+      for (const b of voters.filter((x) => this.players[x].isBot)) this.vote.votes.set(b, {});
+      if (voters.every((s) => this.vote!.votes.has(s))) {
+        this.resolveVote();
+        return;
+      }
+      this.setTimer("vote", this.fast ? 0 : 45000, () => this.resolveVote());
+      return;
+    }
+    for (const c of claims) tenpai[c.seat] = true;
+    this.settleDraw(tenpai);
+  }
+
+  private settleDraw(tenpai: boolean[]) {
+    const before = this.players.map((p) => p.score);
     const notenRiichi = this.players.findIndex((_, s) => this.hands[s].riichi?.accepted && !tenpai[s]);
     if (notenRiichi >= 0) {
       this.chombo(notenRiichi, "ノーテンリーチ", this.handGroups(notenRiichi).map((g) => ({ word: g.word, tiles: g.ids.map((id) => this.hands[notenRiichi].hand.find((t) => t.id === id)!), meld: null, head: false })));
@@ -1520,10 +1620,17 @@ export class Game {
       case "sakubun": {
         if (this.step !== "turn" || this.turn !== seat || this.afterCall) return "作文できません";
         const hp = this.hands[seat];
-        if (hp.melds.length > 0 || hp.hand.length !== 14) return "作文は鳴きなしの14牌で宣言します";
-        const sentence = this.handGroups(seat)
-          .map((g) => g.word)
-          .join("");
+        if (hp.noAgari) return "この局はアガリ放棄です";
+        const sh = hp.hand.length === 14 ? this.sentenceShape(seat) : null;
+        if (!sh) return "作文は鳴きなしの14牌を区切らずに並べて宣言します";
+        let ids = sh.ids;
+        if (sh.extra !== null) {
+          // 離したツモ牌を文章のどこに入れるか
+          const pos = a.pos;
+          if (typeof pos !== "number" || !Number.isInteger(pos) || pos < 0 || pos > ids.length) return "牌を入れる位置を選んでください";
+          ids = [...ids.slice(0, pos), sh.extra, ...ids.slice(pos)];
+        }
+        const sentence = this.sentenceOf(seat, ids);
         this.clearTimer("turn");
         this.consumeBank(seat, this.turnStartedAt);
         this.declareWins([this.claimFor(seat, null, this.drawnTile(seat), null, sentence)]);
@@ -1593,10 +1700,10 @@ export class Game {
       if (this.step === "riipai") this.markRiipaiDone(seat);
       if (this.step === "calls" && this.declare && this.calls.get(seat) && !this.calls.get(seat)!.response) this.respondCall(seat, { call: "pass" });
       if (this.step === "claim" && this.callDetail?.seat === seat) this.resolveCallDetail(seat, null);
-      if (this.step === "claim" && this.pendingRon.some((p) => p.seat === seat && !p.comp && !p.cancelled)) {
-        const pr = this.pendingRon.find((p) => p.seat === seat)!;
-        pr.comp = this.autoPlace(seat);
-        if (this.pendingRon.every((p) => p.comp || p.cancelled)) this.judgeRons();
+      const pr = this.step === "claim" ? this.pendingRon.find((p) => p.seat === seat && !this.ronPlaced(p)) : undefined;
+      if (pr) {
+        this.autoPlace(pr);
+        if (this.pendingRon.every((p) => this.ronPlaced(p))) this.judgeRons();
       }
     }
   }
@@ -1644,7 +1751,7 @@ export class Game {
           }
         }
       } else if (this.step === "claim") {
-        const pr = this.pendingRon.find((p) => p.seat === mySeat && !p.comp && !p.cancelled);
+        const pr = this.pendingRon.find((p) => p.seat === mySeat && !this.ronPlaced(p));
         if (pr) {
           actions = { kind: "ronPlace", tile: this.lastDiscard!.tile };
           deadline = pr.startedAt + 30000;
@@ -1662,7 +1769,8 @@ export class Game {
       vote = {
         claimant: c0.seat,
         claimantName: v.claims.map((c) => this.players[c.seat].name).join("・"),
-        title: c0.form === "sakubun" ? "作文の判定" : "言葉の判定",
+        title: v.tenpai ? "作文テンパイの判定" : c0.form === "sakubun" ? "作文の判定" : "言葉の判定",
+        purpose: v.tenpai ? "tenpai" : "agari",
         items: v.claims.flatMap((c, ci) => c.items.map((it) => ({ ...it, id: ci * 100 + it.id, detail: `${v.claims.length > 1 ? this.players[c.seat].name + "：" : ""}${it.detail ?? ""}` }))),
         words: v.claims.flatMap((c) => this.winGroups(c).map((g) => g.word)),
         canVote: mySeat !== null && v.voters.includes(mySeat) && !v.votes.has(mySeat),

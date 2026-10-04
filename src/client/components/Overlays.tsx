@@ -214,7 +214,7 @@ export function VoteModal({ g }: { g: GameView }) {
         <div className="result-title small">{v.title}</div>
         {v.words.length > 0 && v.items.every((i) => i.kind !== "word" || i.known) && <div className="vote-allknown">すべて辞書にある語です</div>}
         <div className="vote-who">
-          <b>{v.claimantName}</b> さんのアガリ
+          <b>{v.claimantName}</b> さんの{v.purpose === "tenpai" ? "テンパイ（作文待ち）" : "アガリ"}
         </div>
         <div className="vote-words">
           {v.words.map((w, i) => (
@@ -255,7 +255,11 @@ export function VoteModal({ g }: { g: GameView }) {
             </span>
           )}
         </div>
-        <div className="hint">言葉として認めない語だけ「×」にしてください。多数決で決まります（同数は不可、時間切れは承認扱い）。認められないとチョンボになります。</div>
+        <div className="hint">
+          {v.purpose === "tenpai"
+            ? "あと1牌で文章になるなら「○」にしてください。多数決で決まります（同数は不可、時間切れは承認扱い）。認められないとノーテンリーチでチョンボになります。"
+            : "言葉として認めない語だけ「×」にしてください。多数決で決まります（同数は不可、時間切れは承認扱い）。認められないとチョンボになります。"}
+        </div>
       </div>
     </div>
   );

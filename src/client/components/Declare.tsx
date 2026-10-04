@@ -38,16 +38,20 @@ export function PlaceDialog(props: {
   cancelLabel: string;
   onCancel: () => void;
   danger?: boolean;
+  /** 作文：区切りのない文章に入れる（形の判定はしない） */
+  sentence?: boolean;
 }) {
   const { groups, extra, meldCount } = props;
   const [pick, setPick] = useState<{ g: number; p: number } | null>(null);
   const left = useLeft(props.deadline);
+  // 作文は14枚が1列に並ぶので小さめの牌にする
+  const tsz = props.sentence ? "sm" : "md";
   const preview = groups.map((g, gi) => (pick && pick.g === gi ? [...g.slice(0, pick.p), extra, ...g.slice(pick.p)] : g));
   const shape = shapeLabel(
     preview.map((g) => g.length),
     meldCount,
   );
-  const ok = !!pick && shape.cls === "shape-win";
+  const ok = !!pick && (props.sentence || shape.cls === "shape-win");
   return (
     <div className="modal-back">
       <div className="modal declare">
@@ -66,9 +70,9 @@ export function PlaceDialog(props: {
                 {Array.from({ length: g.length + 1 }).map((_, p) => (
                   <span key={p} className="place-cell">
                     <button className={`slot ${pick?.g === gi && pick.p === p ? "on" : ""}`} onClick={() => setPick({ g: gi, p })} title="ここに入れる">
-                      {pick?.g === gi && pick.p === p ? <Tile ch={extra.ch} size="md" className="win-tile" /> : <i>＋</i>}
+                      {pick?.g === gi && pick.p === p ? <Tile ch={extra.ch} size={tsz} className="win-tile" /> : <i>＋</i>}
                     </button>
-                    {p < g.length && <Tile ch={g[p].ch} size="md" />}
+                    {p < g.length && <Tile ch={g[p].ch} size={tsz} />}
                   </span>
                 ))}
               </div>
@@ -76,7 +80,9 @@ export function PlaceDialog(props: {
             </div>
           ))}
         </div>
-        <div className={`shape ${shape.cls}`}>{pick ? shape.text : "＋をクリックして、牌を入れる場所を選んでください"}</div>
+        <div className={`shape ${props.sentence ? (pick ? "shape-win" : "") : shape.cls}`}>
+          {!pick ? "＋をクリックして、牌を入れる場所を選んでください" : props.sentence ? "作文（14牌で1つの文章）" : shape.text}
+        </div>
         <div className="modal-foot gap">
           <button className={`btn ${props.danger ? "btn-danger" : "btn-ghost"}`} onClick={props.onCancel}>
             {props.cancelLabel}

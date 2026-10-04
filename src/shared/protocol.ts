@@ -170,6 +170,8 @@ export interface VoteView {
   claimant: number;
   claimantName: string;
   title: string;
+  /** アガリの確認か、流局時の作文テンパイの確認か */
+  purpose: "agari" | "tenpai";
   items: VoteItem[];
   /** 手牌の語（参考表示） */
   words: string[];
@@ -268,7 +270,8 @@ export type GameAction =
   | { type: "tsumo" }
   | { type: "ankan"; optionId: number }
   | { type: "kakan"; optionId: number }
-  | { type: "sakubun" }
+  /** pos：リーチ中に離したツモ牌を文章の何文字目に入れるか */
+  | { type: "sakubun"; pos?: number }
   | { type: "call"; call: "ron" | "pon" | "kan" | "pass"; optionId?: number }
   | { type: "ronPlace"; group: number; pos: number }
   | { type: "ronCancel" }

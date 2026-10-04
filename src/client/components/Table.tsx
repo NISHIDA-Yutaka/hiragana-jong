@@ -63,6 +63,7 @@ export function Table() {
   const [auto, setAuto] = useState(() => lsGet("auto", { win: false, noCall: false, tsumogiri: false }));
   const [oneClick, setOneClick] = useState(() => lsGet("oneClick", false));
   const [tsumoOpen, setTsumoOpen] = useState(false);
+  const [sakuPlace, setSakuPlace] = useState(false);
   const declare = g.judgeMode === "declare";
   const [, force] = useState(0);
   const lastSeq = useRef<number>(Math.max(0, ...g.events.map((e) => e.seq)));
@@ -125,6 +126,7 @@ export function Table() {
     setRiichiMode(null);
     setChooser(null);
     setTsumoOpen(false);
+    setSakuPlace(false);
   }, [actions?.kind, g.turn, g.phase]);
 
   // 自動和了・鳴きなし・ツモ切り
@@ -168,6 +170,8 @@ export function Table() {
   const me4 = g.seats[me];
   const isMyTurn = g.turn === me && !spectator;
   const myMelds = me4?.melds ?? [];
+  // 区切らずに並べた13枚へのロンは作文
+  const ronSentence = actions?.kind === "ronPlace" && myMelds.length === 0 && g.myHand.length === 13 && toGroups(g.arrangement, g.myHand).length === 1;
 
   return (
     <div className="table-root">
@@ -428,7 +432,12 @@ export function Table() {
               ) : turnA && g.phase === "play" ? (
                 <>
                   {turnA.canTsumo && (
-                    <button className={`abtn abtn-ron ${declare ? "abtn-quiet" : ""}`} onClick={() => (declare ? setTsumoOpen(true) : act({ type: "tsumo" }))}>
+                    <button className={`abtn abtn-ron ${declare ? "abtn-quiet" : ""}`} onClick={() => {
+                        // 作文待ちのリーチでツモ牌が離れているときは作文の宣言にする
+                        if (turnA.canSakubun && toGroups(g.arrangement, g.myHand).length === 2) setSakuPlace(true);
+                        else if (declare) setTsumoOpen(true);
+                        else void act({ type: "tsumo" });
+                      }}>
                       ツモ
                     </button>
                   )}
@@ -458,6 +467,8 @@ export function Table() {
                     <button
                       className="abtn abtn-saku"
                       onClick={() => {
+                        // リーチ中でツモ牌が離れているときは、文章のどこに入れるか選ぶ
+                        if (toGroups(g.arrangement, g.myHand).length === 2) return setSakuPlace(true);
                         const text = g.arrangement?.order.map((id) => g.myHand.find((t) => t.id === id)?.ch ?? "").join("");
                         if (confirm(`並べた順の「${text}」を文章として作文を宣言しますか？\n（他の人の投票で判定されます）`)) void act({ type: "sakubun" });
                       }}
@@ -476,10 +487,29 @@ export function Table() {
         {g.riipai && <RiipaiBoard r={g.riipai} />}
       </div>
 
+      {sakuPlace && turnA && (
+        <PlaceDialog
+          title="作文でツモ"
+          lead="ツモ牌を文章のどこに入れるか選んで宣言します。他の人の投票で判定され、認められないとチョンボです。"
+          groups={toGroups(g.arrangement, g.myHand).slice(0, 1)}
+          extra={toGroups(g.arrangement, g.myHand)[1][0]}
+          meldCount={0}
+          deadline={null}
+          confirmLabel="作文を宣言"
+          onConfirm={(_, pos) => {
+            setSakuPlace(false);
+            void act({ type: "sakubun", pos });
+          }}
+          cancelLabel="やめる"
+          onCancel={() => setSakuPlace(false)}
+          sentence
+        />
+      )}
       {actions?.kind === "ronPlace" && (
         <PlaceDialog
           title="ロン"
-          lead="ロン牌を入れる場所を選んでください。認められないとチョンボ（満貫払い）です。"
+          lead={ronSentence ? "ロン牌を文章のどこに入れるか選んでください（作文）。認められないとチョンボ（満貫払い）です。" : "ロン牌を入れる場所を選んでください。認められないとチョンボ（満貫払い）です。"}
+          sentence={ronSentence}
           groups={toGroups(g.arrangement, g.myHand)}
           extra={actions.tile}
           meldCount={myMelds.length}

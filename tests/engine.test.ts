@@ -400,6 +400,91 @@ describe("自己申告", () => {
   });
 });
 
+describe("作文リーチ（自己申告）", () => {
+  const declare = { judgeMode: "declare" as const };
+  const SENT = "あいうえおかきくけこさしす";
+
+  /** 親が13枚を区切らずに並べ、離した「そ」でリーチする */
+  function riichiSakubun(draws: string) {
+    const { game } = makeGame(rigWall(SENT, "たちつてとなにぬねのはひふ", "そ" + draws), { settings: declare });
+    const so = game.viewFor("a").myHand.find((t) => t.ch === "そ")!;
+    const order = [...game.viewFor("a").myHand.filter((t) => t.id !== so.id).map((t) => t.id), so.id];
+    game.setArrangement("a", { order, breaks: [order[12]] });
+    let v = game.viewFor("a");
+    if (v.actions?.kind !== "turn") throw new Error("not turn");
+    // 離した牌があるうちは（リーチ前は）作文ボタンを出さない
+    expect(v.actions.canSakubun).toBe(false);
+    expect(game.act("a", { type: "discard", tileId: so.id, riichi: "riichi" })).toBeNull();
+    game.act("b", { type: "call", call: "pass" });
+    v = game.viewFor("a");
+    expect(v.seats[0].riichi).toBe(true);
+    expect(v.arrangement!.breaks).toEqual([]);
+    return game;
+  }
+
+  /** 手番の人がツモ切りし、受付は見送る */
+  function passTurn(game: Game) {
+    const v = game.viewFor("a");
+    const who = v.turn === 0 ? "a" : "b";
+    const other = who === "a" ? "b" : "a";
+    game.act(who, { type: "discard", tileId: game.viewFor(who).drawnId! });
+    if (game.viewFor(other).actions?.kind === "call") game.act(other, { type: "call", call: "pass" });
+  }
+
+  it("リーチ中のツモ牌を文章に入れて作文でツモアガリ（立直と複合）", () => {
+    const game = riichiSakubun("へせ");
+    passTurn(game); // B がツモ切り
+    const v = game.viewFor("a");
+    if (v.actions?.kind !== "turn") throw new Error("not turn");
+    expect(v.actions.canSakubun).toBe(true);
+    expect(game.act("a", { type: "sakubun" })).not.toBeNull(); // 位置が必要
+    expect(game.act("a", { type: "sakubun", pos: 12 })).toBeNull();
+    const vb = game.viewFor("b");
+    expect(vb.vote?.purpose).toBe("agari");
+    expect(vb.vote?.items[0].text).toBe("あいうえおかきくけこさしせす");
+    game.act("b", { type: "vote", votes: {} });
+    const r = game.viewFor("a").result!;
+    expect(r.kind).toBe("agari");
+    const names = r.wins[0].yaku.map((y) => y.name);
+    expect(names).toContain("作文");
+    expect(names.some((n) => n.startsWith("立直"))).toBe(true);
+    expect(r.wins[0].groups[0].word).toBe("あいうえおかきくけこさしせす");
+  });
+
+  it("作文はロンでもアガれる（ロン牌を文章のどこに入れるか選ぶ）", () => {
+    const game = riichiSakubun("せ");
+    game.act("b", { type: "discard", tileId: game.viewFor("b").drawnId! });
+    expect(game.act("a", { type: "call", call: "ron" })).toBeNull();
+    expect(game.viewFor("a").actions?.kind).toBe("ronPlace");
+    expect(game.act("a", { type: "ronPlace", group: 0, pos: 12 })).toBeNull();
+    game.act("b", { type: "vote", votes: {} });
+    const r = game.viewFor("a").result!;
+    expect(r.kind).toBe("agari");
+    expect(r.wins[0].fromSeat).toBe(1);
+    expect(r.wins[0].yaku.map((y) => y.name)).toContain("作文");
+  });
+
+  it("流局時の作文待ちは投票で確認し、認められればテンパイ、否決ならノーテンリーチ", () => {
+    for (const approve of [true, false]) {
+      const game = riichiSakubun("");
+      for (let i = 0; i < 400 && game.viewFor("a").phase === "play"; i++) passTurn(game);
+      const vb = game.viewFor("b");
+      expect(vb.phase).toBe("vote");
+      expect(vb.vote?.purpose).toBe("tenpai");
+      expect(vb.vote?.items[0].text).toBe(SENT);
+      game.act("b", { type: "vote", votes: approve ? {} : { [vb.vote!.items[0].id]: false } });
+      const r = game.viewFor("a").result!;
+      if (approve) {
+        expect(r.kind).toBe("ryuukyoku");
+        expect(r.tenpai.find((t) => t.seat === 0)?.tenpai).toBe(true);
+      } else {
+        expect(r.kind).toBe("chombo");
+        expect(r.note).toContain("ノーテンリーチ");
+      }
+    }
+  });
+});
+
 describe("理牌タイム", () => {
   it("局の始めは全員が理牌を終えるまで始まらず、親は14枚で待つ", () => {
     const { game } = makeGame(rigWall("ねこさくらくるまたぬききつ", "いぬそらやまかさはないすと", "ね"), { settings: { judgeMode: "declare", riipaiSeconds: 180 } });

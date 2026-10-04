@@ -7,6 +7,8 @@ export function shapeLabel(lens: number[], meldCount: number): { text: string; c
   const twos = lens.filter((l) => l === 2).length;
   const threes = lens.filter((l) => l === 3).length;
   const text = lens.join("・");
+  // 区切りなしの13・14枚は作文の形
+  if (meldCount === 0 && lens.length === 1 && (lens[0] === 13 || lens[0] === 14)) return { text: `${text}　区切りなし（作文の形）`, cls: "" };
   const full = 2 + 3 * need3;
   if (total === full) {
     if ((twos === 1 && threes === need3 && lens.length === need3 + 1) || (meldCount === 0 && twos === 7 && lens.length === 7)) return { text: `${text}　アガリの形`, cls: "shape-win" };
