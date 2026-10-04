@@ -2251,19 +2251,20 @@ fieldset:disabled .seg button:not(.on) {
   position: absolute;
   inset: 0;
   z-index: 1;
-  perspective: 1400px;
-  perspective-origin: 50% 0%;
+  /* 雀たま風：カメラを低く・広角にして、卓を画面いっぱいに奥へ広げる */
+  perspective: 950px;
+  perspective-origin: 50% 30%;
   pointer-events: none;
 }
 .table-3d .table-square {
-  left: 330px;
-  top: -95px;
-  width: 940px;
-  height: 940px;
-  transform: rotateX(34deg) scale(1.12);
-  transform-origin: 50% 66%;
+  left: 150px;
+  top: -330px;
+  width: 1300px;
+  height: 1300px;
+  transform: rotateX(46deg);
+  transform-origin: 50% 50%;
   transform-style: preserve-3d;
-  border-radius: 56px;
+  border-radius: 70px;
   background:
     radial-gradient(ellipse at 50% 50%, rgba(80, 180, 135, 0.28), transparent 62%),
     radial-gradient(ellipse at 50% 50%, #157052 0%, #0d4a37 60%, #08311f 100%);
@@ -2274,17 +2275,31 @@ fieldset:disabled .seg button:not(.on) {
     0 60px 120px rgba(0, 0, 0, 0.7);
 }
 .table-3d .table-square::before {
-  inset: 56px;
+  inset: 30px;
   border-color: rgba(231, 196, 108, 0.18);
 }
 .table-3d .zone,
 .table-3d .opp-hand {
   transform-style: preserve-3d;
 }
+/* 他家の手牌は縁ではなく卓の布の上に置く */
 .table-3d .opp-hand {
-  top: 386px;
-  left: -320px;
-  width: 640px;
+  top: 470px;
+  left: -360px;
+  width: 720px;
+}
+/* 中央の情報と捨て牌は少し大きく */
+.table-3d .center-box {
+  transform: translate(-50%, -50%) scale(1.16);
+}
+.table-3d .discards {
+  left: -139px;
+  top: 144px;
+  transform: scale(1.16);
+  transform-origin: 0 0;
+}
+.table-3d .riichi-stick {
+  top: 116px;
 }
 /* 他家の手牌は卓の上に立て、実際の卓と同じく持ち主側へ少し傾ける（卓の中央＝カメラ側に背が見える） */
 .table-3d .backs {
@@ -2317,23 +2332,35 @@ fieldset:disabled .seg button:not(.on) {
 }
 .callout-layer .callout-bottom {
   left: 800px;
-  top: 560px;
+  top: 540px;
 }
 .callout-layer .callout-top {
   left: 800px;
-  top: 150px;
+  top: 165px;
 }
 .callout-layer .callout-left {
-  left: 430px;
-  top: 360px;
+  left: 380px;
+  top: 330px;
 }
 .callout-layer .callout-right {
-  left: 1170px;
-  top: 360px;
+  left: 1220px;
+  top: 330px;
 }
 .callout-layer .callout-center {
   left: 800px;
-  top: 360px;
+  top: 320px;
+}
+/* 名札は他家の手牌（卓の端）と重ならない位置に */
+.plate-left,
+.plate-right {
+  top: 150px;
+}
+.plate-top {
+  left: 330px;
+  top: 22px;
+}
+.plate-bottom {
+  bottom: 110px;
 }
 /* ------------------------------------------------------------ 立てた牌（6面の箱） */
 .tbox {
