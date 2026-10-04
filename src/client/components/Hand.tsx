@@ -279,14 +279,18 @@ export function Hand({ hand, serverArr, drawnId, locked, discardable, highlight,
                     style={isDrag ? { transform: `translate(${drag!.dx / scale}px, ${drag!.dy / scale}px)` } : undefined}
                     onPointerDown={(e) => onDown(e, id)}
                   />
-                  {!locked && (i < g.length - 1 || gi < groups.length - 1) && (
-                    <button
-                      className={`seam ${i === g.length - 1 ? "seam-open" : ""}`}
-                      title={i === g.length - 1 ? "つなげる" : "ここで区切る"}
-                      onClick={() => toggleBreak(id)}
-                      tabIndex={-1}
-                    />
-                  )}
+                  {(i < g.length - 1 || gi < groups.length - 1) &&
+                    (locked ? (
+                      // リーチ中も区切りのすき間はそのまま残す（クリックはできない）
+                      <span className={`seam seam-locked ${i === g.length - 1 ? "seam-open" : ""}`} />
+                    ) : (
+                      <button
+                        className={`seam ${i === g.length - 1 ? "seam-open" : ""}`}
+                        title={i === g.length - 1 ? "つなげる" : "ここで区切る"}
+                        onClick={() => toggleBreak(id)}
+                        tabIndex={-1}
+                      />
+                    ))}
                 </div>
               );
             })}

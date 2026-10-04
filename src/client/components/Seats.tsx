@@ -29,6 +29,16 @@ export function Meld({ m, size = "sm", glyph = 0 }: { m: MeldView; size?: TileSi
   );
 }
 
+/**
+ * 捨て牌の重なり順。牌の厚みは画面の下（手前）に描くので、手前にある牌ほど上に重ねる。
+ * 右の席は列が画面の上へ、正面の席は段が画面の上へ伸びるため、その向きだけ順番を逆にする
+ */
+function discardZ(pos: Pos, row: number, col: number): number {
+  if (pos === "right") return 10 - col;
+  if (pos === "top") return 10 - row;
+  return 1;
+}
+
 export function SeatZone({ s, pos, isMe, lastDiscardId, isTurn }: { s: SeatView; pos: Pos; isMe: boolean; lastDiscardId: number | null; isTurn: boolean }) {
   const a = ANGLE[pos];
   const g = -a;
@@ -42,8 +52,8 @@ export function SeatZone({ s, pos, isMe, lastDiscardId, isTurn }: { s: SeatView;
       <div className="discards">
         {rows.map((row, ri) => (
           <div key={ri} className="drow">
-            {row.map((d) => (
-              <div key={d.tile.id} className="dslot">
+            {row.map((d, di) => (
+              <div key={d.tile.id} className="dslot" style={{ zIndex: discardZ(pos, ri, di) }}>
                 <Tile
                   ch={d.tile.ch}
                   size="md"
