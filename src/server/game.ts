@@ -1168,6 +1168,7 @@ export class Game {
       tenhou: claim.tenhou,
       chiihou: claim.chiihou,
       theme: withoutTheme ? null : claim.theme,
+      extraTiles: this.settings.extraTiles,
     };
     return computeYaku(inp);
   }

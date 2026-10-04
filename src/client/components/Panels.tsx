@@ -196,12 +196,16 @@ const YAKU_TABLE: [string, string, string][] = [
   ["特殊文字ドラ", "副次", "特殊文字4枚以上で（枚数−3）翻"],
 ];
 
+/** 基本の牌（特殊文字が「ー」1枚だけ）では成り立たないので数えない役 */
+const SPECIAL_YAKU = new Set(["清文", "特文", "純特文", "特殊文字ドラ"]);
+
 export function YakuPanel() {
+  const extraTiles = useStore((s) => s.room?.settings.extraTiles ?? true);
   return (
     <div className="panel-sec">
       <table className="yaku-table">
         <tbody>
-          {YAKU_TABLE.map(([n, h, d]) => (
+          {YAKU_TABLE.filter(([n]) => extraTiles || !SPECIAL_YAKU.has(n)).map(([n, h, d]) => (
             <tr key={n}>
               <td className="yn">{n}</td>
               <td className="yh">{h}</td>
@@ -210,6 +214,7 @@ export function YakuPanel() {
           ))}
         </tbody>
       </table>
+      {!extraTiles && <p className="hint">基本の牌（濁音などの追加なし）では、清文・特文・純特文・特殊文字ドラはありません。</p>}
       <p className="hint">13翻以上は数え役満。点数は1翻1本〜役満32本（親は1.5倍）。1本＝1,000点。</p>
     </div>
   );

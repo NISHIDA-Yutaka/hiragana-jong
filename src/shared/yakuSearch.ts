@@ -50,6 +50,8 @@ export interface SearchInput {
   ippatsu: boolean;
   tenhou: boolean;
   chiihou: boolean;
+  /** 濁音など＋30牌ありか（基本の牌では清文・特文系を数えない） */
+  extraTiles?: boolean;
 }
 
 export interface SearchResult {
@@ -278,8 +280,8 @@ export function searchArrangements(inp: SearchInput, lex: Lexicon, opts: { decom
         }
       }
     }
-    if (!has("特文") && body.every((i) => s[i].sp)) add("特文");
-    if (!has("純特文") && s.every((x) => x.sp)) add("純特文");
+    if (inp.extraTiles !== false && !has("特文") && body.every((i) => s[i].sp)) add("特文");
+    if (inp.extraTiles !== false && !has("純特文") && s.every((x) => x.sp)) add("純特文");
     if (!has("同言") && sameWords(s, false)) add("同言");
     if (!has("重言") && sameWords(s, true)) add("重言");
     if (!has("重回文") && juukaibun(s)) add("重回文");
@@ -304,7 +306,7 @@ export function searchArrangements(inp: SearchInput, lex: Lexicon, opts: { decom
   const evaluate = (words: string[], form: "standard" | "chiitoi") => {
     budget--;
     const groups: WordGroup[] = [...words.map((w) => ({ word: w, concealed: true, kan: false, head: form === "standard" && [...w].length === 2 })), ...meldGroups];
-    const y = computeYaku({ form, groups, tiles, menzen, tsumo: inp.tsumo, riichi: inp.riichi, ippatsu: inp.ippatsu, tenhou: inp.tenhou, chiihou: inp.chiihou, theme: null });
+    const y = computeYaku({ form, groups, tiles, menzen, tsumo: inp.tsumo, riichi: inp.riichi, ippatsu: inp.ippatsu, tenhou: inp.tenhou, chiihou: inp.chiihou, theme: null, extraTiles: inp.extraTiles });
     if (y.mainHan < 1) return;
     const han = y.yakuman ? Math.max(13, y.han) : y.han;
     if (han > res.bestHan) {

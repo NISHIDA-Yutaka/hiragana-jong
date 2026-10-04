@@ -22,6 +22,11 @@ export interface YakuInput {
   chiihou: boolean;
   /** 承認された同種のテーマ宣言（pure=頭を含む＝純同種） */
   theme: null | { name: string; pure: boolean };
+  /**
+   * 濁音など＋30牌ありか（省略時はあり）。基本の牌は特殊文字が「ー」1枚だけなので、
+   * 清文はほぼ必ず付き、特文・純特文・特殊文字ドラは作れない。そのため基本の牌ではこれらを数えない
+   */
+  extraTiles?: boolean;
 }
 
 export interface YakuItem {
@@ -111,7 +116,8 @@ export function computeYaku(inp: YakuInput): YakuResult {
     else add(inp.riichi.double ? "立直（一巡目）" : "立直", inp.riichi.double ? 2 : 1);
   }
   if (inp.ippatsu) add("一発", 1);
-  if (!inp.tiles.some(isSpecial)) add("清文", inp.menzen ? 2 : 1);
+  const specialYaku = inp.extraTiles !== false;
+  if (specialYaku && !inp.tiles.some(isSpecial)) add("清文", inp.menzen ? 2 : 1);
 
   if (inp.form === "sakubun") {
     add("作文", 4);
@@ -205,8 +211,8 @@ export function computeYaku(inp: YakuInput): YakuResult {
 
     // 純特文・特文
     const hasSp = (w: string) => [...w].some(isSpecial);
-    if (words.every(hasSp)) add("純特文", allConcealed ? 4 : 3);
-    else if (body.every((i) => hasSp(words[i]))) add("特文", bodyConcealed ? 3 : 2);
+    if (specialYaku && words.every(hasSp)) add("純特文", allConcealed ? 4 : 3);
+    else if (specialYaku && body.every((i) => hasSp(words[i]))) add("特文", bodyConcealed ? 3 : 2);
 
     // 同種・純同種（宣言して承認されたとき）
     if (inp.theme) {
@@ -232,7 +238,7 @@ export function computeYaku(inp: YakuInput): YakuResult {
   for (const x of g) if (x.kan) kanDora += [...x.word].length - 3;
   if (kanDora > 0) add("カンドラ", kanDora, { sub: true });
   const sp = inp.tiles.filter(isSpecial).length;
-  if (sp >= 4) add("特殊文字ドラ", sp - 3, { sub: true });
+  if (specialYaku && sp >= 4) add("特殊文字ドラ", sp - 3, { sub: true });
 
   const mainHan = items.filter((x) => !x.sub && !x.yakuman).reduce((a, b) => a + b.han, 0) + (items.some((x) => x.yakuman) ? 13 : 0);
   const han = items.filter((x) => !x.yakuman).reduce((a, b) => a + b.han, 0);

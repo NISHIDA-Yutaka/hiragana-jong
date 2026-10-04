@@ -51,7 +51,7 @@ for (const r of target) {
     continue;
   }
   const res = searchArrangements(
-    { chars: r.hand.flatMap((w) => [...w]), melds: r.melds, tsumo: r.tsumo, riichi: r.riichi, ippatsu: r.ippatsu, tenhou: r.tenhou, chiihou: r.chiihou },
+    { chars: r.hand.flatMap((w) => [...w]), melds: r.melds, tsumo: r.tsumo, riichi: r.riichi, ippatsu: r.ippatsu, tenhou: r.tenhou, chiihou: r.chiihou, extraTiles: r.dict.extraTiles },
     lexFor(r),
   );
   n++;

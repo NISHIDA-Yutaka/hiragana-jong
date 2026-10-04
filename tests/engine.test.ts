@@ -74,6 +74,22 @@ describe("役の計算", () => {
     expect(names(r)["同言"]).toBe(4);
   });
 
+  it("純行はどの行でも成り立つ（か行：かみ・きつね・くぎに・けっか・こだま）", () => {
+    const r = computeYaku(base([g("かみ"), g("きつね"), g("くぎに"), g("けっか"), g("こだま")]));
+    expect(names(r)["純行"]).toBe(5);
+  });
+
+  it("基本の牌では清文・特文系・特殊文字ドラを数えない", () => {
+    const words = [g("ねこ"), g("さくら"), g("くるま"), g("たぬき"), g("きつね")];
+    expect(names(computeYaku(base(words)))["清文"]).toBe(2);
+    expect(names(computeYaku(base(words, { extraTiles: false })))["清文"]).toBeUndefined();
+    const sp = [g("ざい"), g("ぎんか"), g("だいす"), g("きっぷ"), g("げーむ")];
+    expect(names(computeYaku(base(sp)))["純特文"]).toBe(4);
+    const r = computeYaku(base(sp, { extraTiles: false }));
+    expect(names(r)["純特文"]).toBeUndefined();
+    expect(names(r)["特殊文字ドラ"]).toBeUndefined();
+  });
+
   it("点数表：親は子の1.5倍、役満は32本", () => {
     expect(paymentFor(1, false, false).ron).toBe(1);
     expect(paymentFor(4, false, true).ron).toBe(12);
@@ -487,12 +503,13 @@ describe("作文リーチ（自己申告）", () => {
 });
 
 describe("作れる役の探索（役のバランス検証用）", () => {
-  const lx = lex.extend(["いた", "たんす", "すいか", "かんさ", "さんぽ"].map((word) => ({ word, verified: true })));
+  const lx = lex.extend(["いた", "たんす", "すいか", "かんさ", "さんぽ", "かみ", "くぎに", "けっか", "こだま"].map((word) => ({ word, verified: true })));
   const find = (words: string[], melds: { type: "pon" | "minkan" | "ankan" | "kakan"; word: string }[] = []) =>
     searchArrangements({ chars: words.flatMap((w) => [...w]), melds, tsumo: false, riichi: null, ippatsu: false, tenhou: false, chiihou: false }, lx).achievable;
 
   it("純行・五連・重言・重回文を見つける", () => {
     expect([...find(["あい", "いなり", "うきわ", "えほん", "おかめ"])]).toEqual(expect.arrayContaining(["純行", "五音"]));
+    expect(find(["かみ", "きつね", "くぎに", "けっか", "こだま"]).has("純行")).toBe(true);
     expect([...find(["いた", "たんす", "すいか", "かんさ", "さんぽ"])]).toEqual(expect.arrayContaining(["五連", "四連", "三連", "二連"]));
     expect([...find(["ねこ", "さくら", "さくら", "たぬき", "たぬき"])]).toEqual(expect.arrayContaining(["重言", "同言"]));
     expect(find(["あい", "たしか", "かした", "さくら", "くるま"]).has("重回文")).toBe(true);
