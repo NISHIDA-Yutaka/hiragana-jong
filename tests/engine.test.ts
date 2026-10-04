@@ -49,9 +49,9 @@ describe("役の計算", () => {
     expect(names(r)["回文"]).toBe(1);
   });
 
-  it("純行：あい・いなり・うきわ・えほん・おかめ（門前5翻、五音と重ねない）", () => {
+  it("純行：あい・いなり・うきわ・えほん・おかめ（門前8翻、五音と重ねない）", () => {
     const r = computeYaku(base([g("あい"), g("いなり"), g("うきわ"), g("えほん"), g("おかめ")]));
-    expect(names(r)["純行"]).toBe(5);
+    expect(names(r)["純行"]).toBe(8);
     expect(names(r)["五音"]).toBeUndefined();
   });
 
@@ -76,7 +76,7 @@ describe("役の計算", () => {
 
   it("純行はどの行でも成り立つ（か行：かみ・きつね・くぎに・けっか・こだま）", () => {
     const r = computeYaku(base([g("かみ"), g("きつね"), g("くぎに"), g("けっか"), g("こだま")]));
-    expect(names(r)["純行"]).toBe(5);
+    expect(names(r)["純行"]).toBe(8);
   });
 
   it("基本の牌では清文・特文系・特殊文字ドラを数えない", () => {

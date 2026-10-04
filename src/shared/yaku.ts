@@ -205,7 +205,7 @@ export function computeYaku(inp: YakuInput): YakuResult {
       const gy = firsts.map(gyouOf);
       const vs = new Set(firsts.map(vowelOf));
       const allVowels = vs.size === 5 && !vs.has(-1);
-      if (allVowels && gy[0] >= 0 && gy.every((x) => x === gy[0])) add("純行", allConcealed ? 5 : 4);
+      if (allVowels && gy[0] >= 0 && gy.every((x) => x === gy[0])) add("純行", allConcealed ? 8 : 6); // ルールブックは4（門前5）。作れる手が0.5%ほどしかないため四連と同じに上げた
       else if (allVowels) add("五音", allConcealed ? 4 : 2);
     }
 
