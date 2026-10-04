@@ -1,5 +1,7 @@
 // ボット同士で対局をシミュレーションして、エンジンの不具合や役のバランスを確かめる
 // 使い方: npx tsx scripts/simulate.ts [対局数] [weak|normal|strong] [tonpuu|hanchan|ikkyoku] [人数]
+// RECORD=ファイル名 をつけると、アガリをログと同じ形式（JSON Lines）で書き出す（analyze-agari.ts で分析できる）
+import { appendFileSync, writeFileSync } from "fs";
 import { Game } from "../src/server/game";
 import { getBaseLexicon, getBotLexicon } from "../src/server/dict";
 import { DEFAULT_SETTINGS, type BotLevel, type GameLength, type RoomSettings } from "../src/shared/protocol";
@@ -9,8 +11,13 @@ const level = (process.argv[3] ?? "normal") as BotLevel;
 const length = (process.argv[4] ?? "tonpuu") as GameLength;
 const n = Number(process.argv[5] ?? 4) as 2 | 3 | 4;
 const verbose = process.env.VERBOSE === "1";
+const recordFile = process.env.RECORD;
+// SEED=数 で CPU の語彙の選び方をずらす（並列で回すとき用）
+const seedOffset = Number(process.env.SEED ?? 0);
+if (recordFile) writeFileSync(recordFile, "");
 
-const settings: RoomSettings = { ...DEFAULT_SETTINGS, length, playerCount: n, timer: "none" };
+// EXTRA=1 で濁音など＋30牌あり
+const settings: RoomSettings = { ...DEFAULT_SETTINGS, length, playerCount: n, timer: "none", extraTiles: process.env.EXTRA === "1" };
 const cfg = { level: settings.dictLevel, seion: settings.seion, extraTiles: settings.extraTiles };
 const base = getBaseLexicon(cfg);
 
@@ -18,7 +25,7 @@ const turns: number[] = [];
 const stats = { hands: 0, tsumo: 0, ron: 0, draw: 0, abort: 0, yaku: new Map<string, number>(), hanHist: new Map<string, number>() };
 
 async function runOne(gi: number) {
-  const players = Array.from({ length: n }, (_, i) => ({ id: `bot${i}`, name: `CPU${i + 1}`, isBot: true, botLevel: level, botLex: getBotLexicon(cfg, level, 1000 * gi + i + 1) }));
+  const players = Array.from({ length: n }, (_, i) => ({ id: `bot${i}`, name: `CPU${i + 1}`, isBot: true, botLevel: level, botLex: getBotLexicon(cfg, level, 1000 * (gi + seedOffset) + i + 1) }));
   let lastResult: unknown = null;
   return new Promise<void>((resolve) => {
     const g: Game = new Game({
@@ -52,6 +59,7 @@ async function runOne(gi: number) {
         playerLex: () => base,
         theme: () => null,
         log: verbose ? (m) => console.log(m) : undefined,
+        record: recordFile ? (rec) => appendFileSync(recordFile, JSON.stringify(rec) + "\n") : undefined,
       },
     });
     g.start();

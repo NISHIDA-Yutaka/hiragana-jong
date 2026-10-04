@@ -5,6 +5,7 @@ import { DEFAULT_SETTINGS, type RoomSettings } from "../src/shared/protocol";
 import { buildTileChars, tileSupply } from "../src/shared/tiles";
 import { computeYaku, paymentFor, type WordGroup, type YakuInput } from "../src/shared/yaku";
 import { Game } from "../src/server/game";
+import { reachedFamilies, searchArrangements } from "../src/shared/yakuSearch";
 
 const WORDS = ["ねこ", "さくら", "くるま", "たぬき", "きつね", "いぬ", "そら", "やま", "かさ", "はな", "いす", "とまと", "たしか", "かした", "あい", "いなり", "うきわ", "えほん", "おかめ", "かもめ", "めだか"];
 const lex = Lexicon.build(
@@ -482,6 +483,30 @@ describe("作文リーチ（自己申告）", () => {
         expect(r.note).toContain("ノーテンリーチ");
       }
     }
+  });
+});
+
+describe("作れる役の探索（役のバランス検証用）", () => {
+  const lx = lex.extend(["いた", "たんす", "すいか", "かんさ", "さんぽ"].map((word) => ({ word, verified: true })));
+  const find = (words: string[], melds: { type: "pon" | "minkan" | "ankan" | "kakan"; word: string }[] = []) =>
+    searchArrangements({ chars: words.flatMap((w) => [...w]), melds, tsumo: false, riichi: null, ippatsu: false, tenhou: false, chiihou: false }, lx).achievable;
+
+  it("純行・五連・重言・重回文を見つける", () => {
+    expect([...find(["あい", "いなり", "うきわ", "えほん", "おかめ"])]).toEqual(expect.arrayContaining(["純行", "五音"]));
+    expect([...find(["いた", "たんす", "すいか", "かんさ", "さんぽ"])]).toEqual(expect.arrayContaining(["五連", "四連", "三連", "二連"]));
+    expect([...find(["ねこ", "さくら", "さくら", "たぬき", "たぬき"])]).toEqual(expect.arrayContaining(["重言", "同言"]));
+    expect(find(["あい", "たしか", "かした", "さくら", "くるま"]).has("重回文")).toBe(true);
+  });
+
+  it("鳴いた語は並べ替えない", () => {
+    // 「さくら」をポンしていると、手牌の「さくら」と同言にはなるが、手牌側は4組で探す
+    const a = find(["ねこ", "さくら", "たぬき", "きつね"], [{ type: "pon", word: "さくら" }]);
+    expect(a.has("同言")).toBe(true);
+    expect(a.has("七対子")).toBe(false);
+  });
+
+  it("実際の役は「その役以上」で数える", () => {
+    expect([...reachedFamilies(["三連", "同頭同尾", "金重言"])].sort()).toEqual(["三連", "二連", "同尾", "同言", "同頭", "同頭同尾", "重言"].sort());
   });
 });
 

@@ -6,6 +6,7 @@ import { BotLevel, ChatMessage, DEFAULT_SETTINGS, GameAction, RoomSettings, Room
 import { normalizeInput, tileSupply, toSeion } from "../shared/tiles";
 import { THEMES } from "../shared/yaku";
 import { getBaseLexicon, getBotLexicon } from "./dict";
+import { appendAgari } from "./agariLog";
 import { Game } from "./game";
 
 export interface Member {
@@ -264,6 +265,7 @@ export class Room {
         wordApproved: (w) => this.addRoomWord(w),
         playerLex: (id) => this.playerLex(id),
         theme: (id) => this.member(id)?.theme ?? null,
+        record: (rec) => appendAgari({ ...rec, room: this.code }),
       },
     });
     for (const m of seated) if (!m.isBot && m.sockets.size === 0) this.game.setConnected(m.id, false);

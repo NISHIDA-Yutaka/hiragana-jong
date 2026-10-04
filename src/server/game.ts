@@ -1,4 +1,5 @@
 // 対局の進行（サーバー側で全ての判定を行う）
+import type { AgariRecord } from "../shared/record";
 import { Arrangement, checkComplete, Completed, completeWith, groupsWithChars, reconcile, WordCheck } from "../shared/arrange";
 import { Lexicon } from "../shared/lexicon";
 import type {
@@ -117,6 +118,8 @@ export interface GameHooks {
   playerLex: (playerId: string) => Lexicon;
   theme: (playerId: string) => { name: string; pure: boolean } | null;
   log?: (msg: string) => void;
+  /** アガリの記録（役のバランスの検証用） */
+  record?: (rec: AgariRecord) => void;
 }
 
 const RULES = {
@@ -1303,6 +1306,43 @@ export class Game {
     }
   }
 
+  private recordAgari(claim: Claim, yaku: YakuResult, groups: { word: string; meld: MeldType | null }[]) {
+    if (!this.hooks.record) return;
+    const s = claim.seat;
+    const hp = this.hands[s];
+    const p = this.players[s];
+    try {
+      this.hooks.record({
+        v: 1,
+        at: new Date().toISOString(),
+        dict: { level: this.settings.dictLevel, seion: this.settings.seion, extraTiles: this.settings.extraTiles },
+        playerCount: this.n,
+        judgeMode: this.settings.judgeMode,
+        name: p.name,
+        isBot: p.isBot,
+        botLevel: p.isBot ? p.botLevel : undefined,
+        dealer: s === this.dealer,
+        tsumo: claim.from === null,
+        fromIsBot: claim.from === null ? null : this.players[claim.from].isBot,
+        turn: hp.discards.length,
+        form: claim.form,
+        hand: groups.filter((g) => !g.meld).map((g) => g.word),
+        melds: hp.melds.map((m) => ({ type: m.type, word: m.word })),
+        winTile: claim.tile?.ch ?? null,
+        riichi: hp.riichi ? { open: hp.riichi.open, double: hp.riichi.double } : null,
+        ippatsu: claim.ippatsu && !!hp.riichi,
+        tenhou: claim.tenhou,
+        chiihou: claim.chiihou,
+        theme: claim.theme,
+        yaku: yaku.items.map((i) => ({ name: i.name, han: i.han })),
+        han: yaku.han,
+        yakuman: yaku.yakuman,
+      });
+    } catch (e) {
+      console.error("[game] record error", e);
+    }
+  }
+
   private finishAgari(wins: { claim: Claim; yaku: YakuResult }[]) {
     const before = this.players.map((p) => p.score);
     const deltas = this.players.map(() => 0);
@@ -1346,6 +1386,7 @@ export class Game {
         gain,
         dealer: isDealer,
       });
+      this.recordAgari(claim, yaku, views[views.length - 1].groups);
       this.log(`${claim.from === null ? "ツモ" : "ロン"} ${this.players[s].name} ${views[views.length - 1].groups.map((g) => g.word).join("・")} ${yaku.label} +${gain}`);
     });
     deltas.forEach((d, i) => (this.players[i].score += d));

@@ -7,6 +7,7 @@ import { fileURLToPath } from "url";
 import { Server, Socket } from "socket.io";
 import type { Arrangement } from "../shared/arrange";
 import type { BotLevel, GameAction, RoomSettings } from "../shared/protocol";
+import { readAgariLog } from "./agariLog";
 import { getWordList, getBaseLexicon } from "./dict";
 import { Member, Room } from "./room";
 
@@ -256,6 +257,17 @@ setInterval(() => {
 }, 60 * 1000);
 
 app.get("/healthz", (_req, res) => res.send("ok"));
+
+// アガリの記録のダウンロード。LOG_KEY を設定したときは ?key= が必要、未設定ならこのPCからだけ
+app.get("/api/agari-log", (req, res) => {
+  const key = process.env.LOG_KEY;
+  const local = ["127.0.0.1", "::1", "::ffff:127.0.0.1"].includes(req.socket.remoteAddress ?? "");
+  if (key ? req.query.key !== key : !local) {
+    res.status(403).send("forbidden");
+    return;
+  }
+  res.type("application/x-ndjson").attachment("agari.jsonl").send(readAgariLog());
+});
 
 // 本番ではビルドしたクライアントを配信
 const here = path.dirname(fileURLToPath(import.meta.url));
