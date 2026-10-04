@@ -1,7 +1,7 @@
 // 卓の各席：捨て牌・相手の手牌・鳴いた語・中央の情報
 import type { GameView, MeldView, SeatView } from "../../shared/protocol";
 import { WIND_NAMES } from "../../shared/tiles";
-import { Tile, TileSize } from "./Tile";
+import { Tile, TileBox, TileSize } from "./Tile";
 
 export type Pos = "bottom" | "right" | "top" | "left";
 export const ANGLE: Record<Pos, number> = { bottom: 0, right: -90, top: 180, left: 90 };
@@ -73,7 +73,7 @@ export function SeatZone({ s, pos, isMe, lastDiscardId, isTurn }: { s: SeatView;
           ) : (
             <div className="backs">
               {Array.from({ length: s.handCount }).map((_, i) => (
-                <Tile key={i} back size="xs" className={isTurn && s.hasDrawn && i === s.handCount - 1 ? "back-drawn" : ""} />
+                <TileBox key={i} className={isTurn && s.hasDrawn && i === s.handCount - 1 ? "back-drawn" : ""} />
               ))}
             </div>
           )}

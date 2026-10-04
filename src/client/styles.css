@@ -2286,23 +2286,14 @@ fieldset:disabled .seg button:not(.on) {
   left: -320px;
   width: 640px;
 }
-/* 他家の手牌は卓の上に立てる。横の席は真横からだと薄く見えるので卓側へ少し傾けて背を見せる */
+/* 他家の手牌は卓の上に立て、実際の卓と同じく持ち主側へ少し傾ける（卓の中央＝カメラ側に背が見える） */
 .table-3d .backs {
   transform-origin: 50% 100%;
-  transform: rotateX(-90deg);
+  transform: rotateX(-98deg);
 }
 .table-3d .zone-left .backs,
 .table-3d .zone-right .backs {
-  transform: rotateX(-58deg);
-}
-.table-3d .backs .tile {
-  --tw: 36px;
-  --th: 48px;
-  margin-bottom: 0;
-  box-shadow:
-    inset 0 0 0 2px rgba(255, 255, 255, 0.22),
-    inset 0 -3px 0 rgba(120, 70, 10, 0.3),
-    0 0 0 1px rgba(80, 45, 5, 0.5);
+  transform: rotateX(-108deg);
 }
 /* 厚みが画面の手前（下）に見えるよう、席の向きに合わせる */
 .zone-top .tile {
@@ -2343,4 +2334,84 @@ fieldset:disabled .seg button:not(.on) {
 .callout-layer .callout-center {
   left: 800px;
   top: 360px;
+}
+/* ------------------------------------------------------------ 立てた牌（6面の箱） */
+.tbox {
+  --w: 36px;
+  --h: 48px;
+  --d: 26px;
+  position: relative;
+  width: var(--w);
+  height: var(--h);
+  flex: none;
+  transform-style: preserve-3d;
+}
+.tf {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: block;
+  backface-visibility: hidden;
+}
+/* 背（山吹色）と表（象牙色） */
+.tf-back,
+.tf-face {
+  width: var(--w);
+  height: var(--h);
+  border-radius: 5px;
+}
+.tf-back {
+  transform: rotateY(180deg) translateZ(calc(var(--d) / 2));
+  background:
+    radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.45), transparent 55%),
+    linear-gradient(170deg, var(--tile-back-1), var(--tile-back-2));
+  box-shadow:
+    inset 0 0 0 1px rgba(120, 70, 10, 0.35),
+    inset 0 -4px 6px rgba(120, 70, 10, 0.25);
+}
+.tf-face {
+  transform: translateZ(calc(var(--d) / 2));
+  background: linear-gradient(175deg, #fffef9, #ece1c6);
+  box-shadow: inset 0 0 0 1px rgba(80, 60, 20, 0.2);
+}
+/* 上下の厚み：背側が山吹色、表側が象牙色の二層 */
+.tf-top,
+.tf-bottom {
+  width: var(--w);
+  height: var(--d);
+  top: calc((var(--h) - var(--d)) / 2);
+  background: linear-gradient(var(--edge-dir, to bottom), #f4ead2 0%, #e8dcbc 52%, var(--tile-edge) 56%, var(--tile-edge-dark) 100%);
+}
+.tf-top {
+  --edge-dir: to top;
+  transform: rotateX(90deg) translateZ(calc(var(--h) / 2));
+  filter: brightness(1.12);
+}
+.tf-bottom {
+  transform: rotateX(-90deg) translateZ(calc(var(--h) / 2));
+  filter: brightness(0.6);
+}
+/* 左右の厚み */
+.tf-left,
+.tf-right {
+  width: var(--d);
+  height: var(--h);
+  left: calc((var(--w) - var(--d)) / 2);
+  background: linear-gradient(var(--edge-dir, to right), #f4ead2 0%, #e8dcbc 52%, var(--tile-edge) 56%, var(--tile-edge-dark) 100%);
+}
+.tf-left {
+  --edge-dir: to left;
+  transform: rotateY(-90deg) translateZ(calc(var(--w) / 2));
+  filter: brightness(0.82);
+}
+.tf-right {
+  transform: rotateY(90deg) translateZ(calc(var(--w) / 2));
+  filter: brightness(0.92);
+}
+.table-3d .backs {
+  transform-style: preserve-3d;
+  gap: 2px;
+}
+.tbox.back-drawn {
+  margin-left: 10px;
 }
