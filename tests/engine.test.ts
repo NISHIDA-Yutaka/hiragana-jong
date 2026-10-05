@@ -429,6 +429,17 @@ describe("作文リーチ（自己申告）", () => {
     expect(r.wins[0].groups[0].word).toBe("あいうえおかきくけこさしせす");
   });
 
+  it("リーチなしでも、離したツモ牌を文章に入れて作文でツモアガリできる", () => {
+    const { game } = makeGame(rigWall(SENT, "たちつてとなにぬねのはひふ", "そ"));
+    const so = game.viewFor("a").myHand.find((t) => t.ch === "そ")!;
+    const order = [...game.viewFor("a").myHand.filter((t) => t.id !== so.id).map((t) => t.id), so.id];
+    game.setArrangement("a", { order, breaks: [order[12]] });
+    expect(game.act("a", { type: "sakubun", pos: 13 })).toBeNull();
+    const vb = game.viewFor("b");
+    expect(vb.vote?.purpose).toBe("agari");
+    expect(vb.vote?.items[0].text).toBe(SENT + "そ");
+  });
+
   it("作文はロンでもアガれる（ロン牌を文章のどこに入れるか選ぶ）", () => {
     const game = riichiSakubun("せ");
     game.act("b", { type: "discard", tileId: game.viewFor("b").drawnId! });

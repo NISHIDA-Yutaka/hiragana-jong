@@ -421,9 +421,13 @@ export function Table() {
                 <>
                   {turnA.canTsumo && (
                     <button className="abtn abtn-ron abtn-quiet" onClick={() => {
-                        // 作文待ちのリーチでツモ牌が離れているときは作文の宣言にする
-                        if (turnA.canSakubun && toGroups(g.arrangement, g.myHand).length === 2) setSakuPlace(true);
-                        else setTsumoOpen(true);
+                        // 鳴きなしで13枚を区切らずに並べ、ツモ牌だけ離しているときは作文の宣言にする（リーチの有無によらない）
+                        const gs = toGroups(g.arrangement, g.myHand);
+                        if (myMelds.length === 0 && gs.length === 2 && gs[0].length === 13 && gs[1].length === 1) setSakuPlace(true);
+                        else if (myMelds.length === 0 && gs.length === 1 && gs[0].length === 14) {
+                          const text = gs[0].map((t) => t.ch).join("");
+                          if (confirm(`並べた順の「${text}」を文章として作文を宣言しますか？\n（他の人の投票で判定されます）`)) void act({ type: "sakubun" });
+                        } else setTsumoOpen(true);
                       }}>
                       ツモ
                     </button>
