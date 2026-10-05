@@ -1448,9 +1448,6 @@ fieldset:disabled .seg button:not(.on) {
     opacity: 0;
   }
 }
-.my-hand.locked .htile {
-  cursor: default;
-}
 .seam {
   width: 4px;
   height: 82px;
@@ -2701,11 +2698,4 @@ fieldset:disabled .seg button:not(.on) {
 }
 .tbox.back-drawn {
   margin-left: 10px;
-}
-.seam-locked {
-  display: block;
-  cursor: default;
-}
-.seam-locked:hover::after {
-  content: none;
 }

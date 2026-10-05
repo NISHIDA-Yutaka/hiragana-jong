@@ -329,7 +329,6 @@ export function Table() {
                 hand={g.myHand}
                 serverArr={g.arrangement}
                 drawnId={g.drawnId}
-                locked={!!me4?.riichi}
                 discardable={discardable}
                 highlight={riichiMode && turnA ? new Set(turnA.riichiDiscards) : null}
                 oneClick={oneClick}
@@ -533,7 +532,7 @@ export function Table() {
           onClose={() => setTsumoOpen(false)}
           onConfirm={(ins) => {
             setTsumoOpen(false);
-            // ツモ牌を入れる場所はサーバーで入れる（リーチ中は並べ替えを送っても受け付けられないため）
+            // ツモ牌を入れる場所は宣言と一緒に送り、サーバーで入れる（並べ替えの送信と宣言の順番がずれないように）
             void act({ type: "tsumo", place: ins ? { group: ins.group, pos: ins.pos } : undefined });
           }}
         />

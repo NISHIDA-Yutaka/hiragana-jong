@@ -363,7 +363,7 @@ describe("自己申告", () => {
     game.act("a", { type: "call", call: "pass" });
     const v = game.viewFor("a");
     expect(v.myHand.find((t) => t.id === v.drawnId)?.ch).toBe("こ");
-    // 並びは「さくら・くるま・たぬき・いなり・ね」＋離れた「こ」。並べ替えはできないので、入れる場所を一緒に送る
+    // 並びは「さくら・くるま・たぬき・いなり・ね」＋離れた「こ」。入れる場所を一緒に送る
     expect(game.act("a", { type: "tsumo" })).not.toBeNull();
     expect(game.act("a", { type: "tsumo", place: { group: 4, pos: 1 } })).toBeNull();
     const r = game.viewFor("a").result!;
@@ -393,6 +393,24 @@ describe("自己申告", () => {
   it("七対子で同じ語を2組使うとアガれず、その理由を伝える", () => {
     const game = sevenPairs("やまうらうらくわふみもちこれ", { chiitoi: true });
     expect(game.act("a", { type: "tsumo" })).toContain("七対子は同じ語を2組使えません（「うら」");
+  });
+
+  it("リーチ後も並べ替え（読み替え）はできるが、切れるのはツモ牌だけ", () => {
+    const { game } = makeGame(rigWall("さくらくるまたぬきいなりね", "いぬそらやまかさはないすと", "そへ"));
+    arrangeAs(game, "a", ["さくら", "くるま", "たぬき", "いなり", "ね"]);
+    const so = game.viewFor("a").myHand.find((t) => t.ch === "そ")!;
+    expect(game.act("a", { type: "discard", tileId: so.id, riichi: "riichi" })).toBeNull();
+    game.act("b", { type: "call", call: "pass" });
+    // リーチ中に「たぬき」を「たぬ・き」に区切り直せる
+    arrangeAs(game, "a", ["さくら", "くるま", "たぬ", "き", "いなり", "ね"]);
+    expect(game.viewFor("a").arrangement!.breaks.length).toBe(6);
+    game.act("b", { type: "discard", tileId: game.viewFor("b").drawnId! });
+    game.act("a", { type: "call", call: "pass" });
+    const v = game.viewFor("a");
+    if (v.actions?.kind !== "turn") throw new Error("not turn");
+    const other = v.myHand.find((t) => t.id !== v.drawnId)!;
+    expect(game.act("a", { type: "discard", tileId: other.id })).not.toBeNull();
+    expect(game.act("a", { type: "discard", tileId: v.drawnId! })).toBeNull();
   });
 
   it("リーチはテンパイの確認なしで宣言できる", () => {

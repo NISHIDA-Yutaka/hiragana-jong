@@ -11,7 +11,6 @@ interface Props {
   hand: TileT[];
   serverArr: Arrangement | null;
   drawnId: number | null;
-  locked: boolean;
   /** クリックで打牌できる牌（null=打牌できない） */
   discardable: Set<number> | null;
   highlight: Set<number> | null;
@@ -31,7 +30,7 @@ function withoutId(arr: Arrangement, id: number): Arrangement {
   return { order, breaks: [...breaks] };
 }
 
-export function Hand({ hand, serverArr, drawnId, locked, discardable, highlight, oneClick, onDiscard, scale, meldCount }: Props) {
+export function Hand({ hand, serverArr, drawnId, discardable, highlight, oneClick, onDiscard, scale, meldCount }: Props) {
   const handKey = useMemo(
     () =>
       hand
@@ -57,9 +56,6 @@ export function Hand({ hand, serverArr, drawnId, locked, discardable, highlight,
     for (const id of [...typedIds.current]) if (!ids.has(id)) typedIds.current.delete(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [handKey]);
-  useEffect(() => {
-    if (locked && serverArr) setArr(serverArr);
-  }, [locked, serverArr]);
 
   const byId = useMemo(() => new Map(hand.map((t) => [t.id, t])), [hand]);
   const valid = arr.order.length === hand.length && arr.order.every((id) => byId.has(id));
@@ -74,7 +70,6 @@ export function Hand({ hand, serverArr, drawnId, locked, discardable, highlight,
   };
 
   const commit = (next: Arrangement) => {
-    if (locked) return;
     snapshot(); // ドラッグ中の位置も含めて記録してから並べ替える
     setArr(next);
     send("game:arrange", next);
@@ -102,7 +97,6 @@ export function Hand({ hand, serverArr, drawnId, locked, discardable, highlight,
     e.preventDefault();
     const w = normalizeInput(typed);
     if (!w) return;
-    if (locked) return toast("リーチ中は並べ替えできません", "error");
     const chars = [...w];
     const used = new Set<number>();
     const picks: number[] = [];
@@ -146,7 +140,7 @@ export function Hand({ hand, serverArr, drawnId, locked, discardable, highlight,
     if (!drag) return;
     const dx = e.clientX - drag.x0;
     const dy = e.clientY - drag.y0;
-    const active = drag.active || (!locked && Math.hypot(dx, dy) > 7);
+    const active = drag.active || Math.hypot(dx, dy) > 7;
     setDrag({ ...drag, dx, dy, active });
   };
   const onUp = (e: RPointerEvent<HTMLDivElement>) => {
@@ -262,7 +256,7 @@ export function Hand({ hand, serverArr, drawnId, locked, discardable, highlight,
 
   return (
     <div className="my-hand-wrap">
-      <div className={`my-hand ${locked ? "locked" : ""}`} ref={rowRef} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={() => setDrag(null)}>
+      <div className="my-hand" ref={rowRef} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={() => setDrag(null)}>
         {groups.map((g, gi) => (
           <div key={gi} className={`hgroup ${g.length >= 2 && g.length <= 8 ? "hgroup-word" : ""} ${drawnAlone && gi === groups.length - 1 ? "hgroup-drawn" : ""}`}>
             {g.map((id, i) => {
@@ -288,18 +282,14 @@ export function Hand({ hand, serverArr, drawnId, locked, discardable, highlight,
                     style={isDrag ? { transform: `translate(${drag!.dx / scale}px, ${drag!.dy / scale}px)` } : undefined}
                     onPointerDown={(e) => onDown(e, id)}
                   />
-                  {(i < g.length - 1 || gi < groups.length - 1) &&
-                    (locked ? (
-                      // リーチ中も区切りのすき間はそのまま残す（クリックはできない）
-                      <span className={`seam seam-locked ${i === g.length - 1 ? "seam-open" : ""}`} />
-                    ) : (
-                      <button
-                        className={`seam ${i === g.length - 1 ? "seam-open" : ""}`}
-                        title={i === g.length - 1 ? "つなげる" : "ここで区切る"}
-                        onClick={() => toggleBreak(id)}
-                        tabIndex={-1}
-                      />
-                    ))}
+                  {(i < g.length - 1 || gi < groups.length - 1) && (
+                    <button
+                      className={`seam ${i === g.length - 1 ? "seam-open" : ""}`}
+                      title={i === g.length - 1 ? "つなげる" : "ここで区切る"}
+                      onClick={() => toggleBreak(id)}
+                      tabIndex={-1}
+                    />
+                  )}
                 </div>
               );
             })}
@@ -311,12 +301,12 @@ export function Hand({ hand, serverArr, drawnId, locked, discardable, highlight,
           {shape.text}
         </span>
         <form onSubmit={gather} className="gather">
-          <input value={typed} onChange={(e) => setTyped(e.target.value)} placeholder="語を入力 → Enterで牌を集める" disabled={locked} />
+          <input value={typed} onChange={(e) => setTyped(e.target.value)} placeholder="語を入力 → Enterで牌を集める" />
         </form>
-        <button className="btn btn-xs btn-ghost" onClick={splitAll} disabled={locked} title="全ての牌を1枚ずつに区切る">
+        <button className="btn btn-xs btn-ghost" onClick={splitAll} title="全ての牌を1枚ずつに区切る">
           全部区切る
         </button>
-        <button className="btn btn-xs btn-ghost" onClick={resetSort} disabled={locked} title="五十音順に並べ直す（区切りも消えます）">
+        <button className="btn btn-xs btn-ghost" onClick={resetSort} title="五十音順に並べ直す（区切りも消えます）">
           リセット
         </button>
       </div>

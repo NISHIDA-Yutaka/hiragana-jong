@@ -479,7 +479,7 @@ export class Game {
     return null;
   }
 
-  /** 作文ボタンを出すか。ツモ牌を離した形はリーチ中（並べ替えできない）だけ */
+  /** 作文ボタンを出すか。ツモ牌を離した形はリーチ中だけ（リーチ前は、離した牌はたいてい切る牌） */
   private canSakubun(seat: number) {
     const sh = this.hands[seat].hand.length === 14 ? this.sentenceShape(seat) : null;
     return !!sh && (sh.extra === null || !!this.hands[seat].riichi);
@@ -1512,7 +1512,7 @@ export class Game {
           const hp = this.hands[seat];
           let groups = this.handGroups(seat);
           if (a.place) {
-            // 離したツモ牌を選んだ場所に入れる（リーチ中は並べ替えできないので、サーバーで入れる）
+            // 離したツモ牌を選んだ場所に入れる
             const last = groups[groups.length - 1];
             const rest = groups.slice(0, -1);
             const g = rest[a.place.group];
@@ -1588,7 +1588,7 @@ export class Game {
     const seat = this.seatOf(playerId);
     if (seat < 0 || !this.hands[seat]) return;
     const hp = this.hands[seat];
-    if (hp.riichi) return; // リーチ後は並びを固定
+    // リーチ後も並べ替え（読み方の変更）はできる。牌はツモ切りしかできないので手牌そのものは変わらない
     const ids = new Set(hp.hand.map((t) => t.id));
     if (!Array.isArray(arr?.order) || !Array.isArray(arr?.breaks)) return;
     if (arr.order.length !== ids.size || !arr.order.every((id) => ids.has(id))) {
