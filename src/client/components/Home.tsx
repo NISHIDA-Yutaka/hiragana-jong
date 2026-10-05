@@ -1,6 +1,7 @@
 import { FormEvent, useState } from "react";
 import { createRoom, joinRoom, lsGet, lsSet, toast, useStore } from "../net";
 import { Tile } from "./Tile";
+import { openYakuWindow, YakuList } from "./YakuList";
 
 export function Home() {
   const connected = useStore((s) => s.connected);
@@ -8,6 +9,7 @@ export function Home() {
   const [name, setName] = useState<string>(lsGet("name", ""));
   const [code, setCode] = useState(urlCode.toUpperCase());
   const [busy, setBusy] = useState(false);
+  const [yakuOpen, setYakuOpen] = useState(false);
 
   const run = async (fn: () => Promise<string | null>) => {
     if (!name.trim()) return toast("名前を入力してください", "error");
@@ -97,7 +99,33 @@ export function Home() {
             <li>2枚の組＋捨て牌で3文字の語ができるときはポン、3枚以上の組なら4文字以上の語でカンできます。</li>
           </ul>
         </details>
+        <div className="home-yaku">
+          <button className="btn btn-ghost" onClick={() => setYakuOpen(true)}>
+            役一覧
+          </button>
+          <button className="btn btn-ghost" onClick={() => openYakuWindow(null)}>
+            別窓で開く
+          </button>
+        </div>
       </div>
+      {yakuOpen && (
+        <div className="modal-back" onClick={() => setYakuOpen(false)}>
+          <div className="modal yaku-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="yaku-modal-head">
+              <span className="result-title small">役一覧</span>
+              <button className="btn btn-xs btn-ghost" onClick={() => openYakuWindow(null)}>
+                別窓で開く
+              </button>
+              <button className="btn btn-xs btn-ghost" onClick={() => setYakuOpen(false)}>
+                閉じる
+              </button>
+            </div>
+            <div className="panel-sec yk yaku-modal-body">
+              <YakuList extraTiles={null} />
+            </div>
+          </div>
+        </div>
+      )}
       <div className="home-foot">友人と遊ぶための非公式オンライン版です。辞書データ: JMdict (EDRDG, CC BY-SA 4.0)</div>
     </div>
   );
