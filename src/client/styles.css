@@ -2301,9 +2301,14 @@ fieldset:disabled .seg button:not(.on) {
 .table-3d .riichi-stick {
   top: 116px;
 }
-/* 3人打ちの河は1段10枚で、持ち主から見て右（空いている卓の角）へ伸ばす */
+/* 3人打ちの河は1段10枚で、持ち主から見て右（空いている卓の角）へ伸ばす。
+   伸ばした段が隣の人の河と角で接するので、中央から少し離してすき間を作る */
 .discards-3p {
   width: 400px;
+  top: 156px;
+}
+.table-3d .discards-3p {
+  top: 180px;
 }
 /* 2人打ちの河は1段16枚の横長にして、中央にそろえる */
 .discards-2p {
