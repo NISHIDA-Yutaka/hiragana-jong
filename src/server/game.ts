@@ -831,7 +831,7 @@ export class Game {
       i === group ? { word: [...chars.slice(0, pos), t.ch, ...chars.slice(pos)].join(""), ids: [...g.ids.slice(0, pos), t.id, ...g.ids.slice(pos)] } : x,
     );
     const comp = checkComplete(ng, hp.melds.length, this.loose(seat));
-    if (!comp) return "アガリの形（2文字×1＋3文字×4、または2文字×7）になりません";
+    if (!comp) return shapeError(ng, hp.melds.length, "になりません");
     pr.comp = comp;
     if (this.pendingRon.every((p) => this.ronPlaced(p))) this.judgeRons();
     return null;
@@ -1544,7 +1544,7 @@ export class Game {
             groups = rest;
           }
           const comp = checkComplete(groups, hp.melds.length, this.loose(seat));
-          if (!comp) return "アガリの形（2文字×1＋3文字×4、または2文字×7）に並べてください";
+          if (!comp) return shapeError(groups, hp.melds.length, "に並べてください");
           this.clearTimer("turn");
           this.consumeBank(seat, this.turnStartedAt);
           this.declareWins([this.claimFor(seat, null, this.drawnTile(seat), comp)]);
@@ -1752,4 +1752,16 @@ export class Game {
       myTheme: playerId ? this.hooks.theme(playerId) : null,
     };
   }
+}
+
+/** アガリ形にならないときの理由。七対子で同じ語が2組あるときはそれを伝える */
+function shapeError(groups: { word: string }[], meldCount: number, tail: string): string {
+  if (meldCount === 0 && groups.length === 7 && groups.every((x) => [...x.word].length === 2)) {
+    const seen = new Set<string>();
+    for (const x of groups) {
+      if (seen.has(x.word)) return `七対子は同じ語を2組使えません（「${x.word}」が2組あります）`;
+      seen.add(x.word);
+    }
+  }
+  return `アガリの形（2文字×1＋3文字×4、または異なる2文字×7）${tail}`;
 }

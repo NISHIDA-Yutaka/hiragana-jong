@@ -371,6 +371,19 @@ describe("自己申告", () => {
     expect(r.wins[0].groups.map((x) => x.word)).toContain("ねこ");
   });
 
+  it("七対子で同じ語を2組使うとアガれず、その理由を伝える", () => {
+    const { game } = makeGame(rigWall("やまうらうらくわふみもちこ", "いぬそらやまかさはないすと", "れ"));
+    const hand = game.viewFor("a").myHand;
+    const used = new Set<number>();
+    const order = [..."やまうらうらくわふみもちこれ"].map((ch) => {
+      const t = hand.find((x) => x.ch === ch && !used.has(x.id))!;
+      used.add(t.id);
+      return t.id;
+    });
+    game.setArrangement("a", { order, breaks: [1, 3, 5, 7, 9, 11].map((i) => order[i]) });
+    expect(game.act("a", { type: "tsumo" })).toContain("七対子は同じ語を2組使えません（「うら」");
+  });
+
   it("リーチはテンパイの確認なしで宣言できる", () => {
     const { game } = makeGame(rigWall("ねこさくらくるまたぬききつ", "いぬそらやまかさはないすと", "そ"));
     const v = game.viewFor("a");

@@ -48,7 +48,7 @@ export function PlaceDialog(props: {
   const tsz = props.sentence ? "sm" : "md";
   const preview = groups.map((g, gi) => (pick && pick.g === gi ? [...g.slice(0, pick.p), extra, ...g.slice(pick.p)] : g));
   const shape = shapeLabel(
-    preview.map((g) => g.length),
+    preview.map((g) => g.map((t) => t.ch).join("")),
     meldCount,
   );
   const ok = !!pick && (props.sentence || shape.cls === "shape-win");
@@ -109,7 +109,7 @@ export function TsumoDialog({
   onClose: () => void;
 }) {
   const shape = shapeLabel(
-    groups.map((g) => g.length),
+    groups.map((g) => g.map((t) => t.ch).join("")),
     meldCount,
   );
   if (shape.cls === "shape-win") {
@@ -165,7 +165,7 @@ export function TsumoDialog({
       <div className="modal declare">
         <div className="result-title small">ツモ</div>
         <p className="declare-lead">
-          手牌を「2文字×1＋3文字×4」（七対子なら2文字×7）に区切ってから宣言してください。
+          手牌を「2文字×1＋3文字×4」（七対子なら異なる2文字×7）に区切ってから宣言してください。
           <br />
           今の形：{shape.text}
         </p>

@@ -251,7 +251,11 @@ export function Hand({ hand, serverArr, drawnId, locked, discardable, highlight,
 
   const groups = groupIds(cur);
   const lastGroup = groups[groups.length - 1];
-  const shape = shapeLabel(groups.map((x) => x.length), meldCount);
+  const chOf = new Map(hand.map((t) => [t.id, t.ch]));
+  const shape = shapeLabel(
+    groups.map((x) => x.map((id) => chOf.get(id) ?? "").join("")),
+    meldCount,
+  );
   const drawnAlone = drawnId !== null && lastGroup?.length === 1 && lastGroup[0] === drawnId;
 
   return (
