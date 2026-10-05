@@ -212,17 +212,20 @@ export function VoteModal({ g }: { g: GameView }) {
     <div className="modal-back">
       <div className="modal vote">
         <div className="result-title small">{v.title}</div>
-        {v.words.length > 0 && v.items.every((i) => i.kind !== "word" || i.known) && <div className="vote-allknown">すべて辞書にある語です</div>}
         <div className="vote-who">
           <b>{v.claimantName}</b> さんの{v.purpose === "tenpai" ? "テンパイ（作文待ち）" : "アガリ"}
         </div>
         <div className="vote-words">
-          {v.words.map((w, i) => (
-            <span key={i} className="chip">
-              {w}
-            </span>
-          ))}
+          {v.words.map((w, i) => {
+            const asked = v.items.some((it) => it.kind === "word" && it.text === w);
+            return (
+              <span key={i} className={`chip ${asked ? "chip-ask" : "chip-ok"}`} title={asked ? "辞書にない語（投票）" : "辞書にある語（自動で承認）"}>
+                {asked ? "？" : "✓"} {w}
+              </span>
+            );
+          })}
         </div>
+        {v.words.length > 0 && <div className="vote-allknown">✓ の語は辞書にあるので自動で認めています。下の項目だけ投票してください。</div>}
         <div className="vote-items">
           {v.items.map((it) => (
             <div key={it.id} className="vote-item">

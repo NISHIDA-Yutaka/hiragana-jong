@@ -190,7 +190,6 @@ describe("対局の進行", () => {
     const { game } = makeGame(rigWall("ねこさくらくるまたぬききつ", "いぬそらやまかさはないすと", "ね"));
     arrangeAs(game, "a", ["ねこ", "さくら", "くるま", "たぬき", "きつね"]);
     expect(game.act("a", { type: "tsumo" })).toBeNull();
-    game.act("b", { type: "vote", votes: {} });
     const v = game.viewFor("a");
     expect(v.result?.kind).toBe("agari");
     const yaku = v.result!.wins[0].yaku.map((y) => y.name);
@@ -244,7 +243,7 @@ describe("対局の進行", () => {
 
 describe("自己申告", () => {
 
-  it("ツモはいつでも宣言でき、他の人の承認でアガリ", () => {
+  it("ツモはいつでも宣言でき、辞書にある語だけなら投票なしでアガリ", () => {
     const { game } = makeGame(rigWall("ねこさくらくるまたぬききつ", "いぬそらやまかさはないすと", "ね"));
     const v = game.viewFor("a");
     expect(v.actions?.kind === "turn" && v.actions.canTsumo).toBe(true);
@@ -252,20 +251,17 @@ describe("自己申告", () => {
     expect(game.act("a", { type: "tsumo" })).not.toBeNull();
     arrangeAs(game, "a", ["ねこ", "さくら", "くるま", "たぬき", "きつね"]);
     expect(game.act("a", { type: "tsumo" })).toBeNull();
-    const vb = game.viewFor("b");
-    expect(vb.phase).toBe("vote");
-    expect(vb.vote!.items.map((i) => i.text)).toEqual(["ねこ", "さくら", "くるま", "たぬき", "きつね"]);
-    expect(vb.vote!.items.every((i) => i.known)).toBe(true);
-    game.act("b", { type: "vote", votes: {} });
+    expect(game.viewFor("b").vote).toBeNull();
     expect(game.viewFor("a").result?.kind).toBe("agari");
   });
 
-  it("否決されるとチョンボ（満貫払い）", () => {
+  it("辞書にない語だけが投票になり、否決されるとチョンボ（満貫払い）", () => {
     const { game } = makeGame(rigWall("ねこさくらくるまたぬききつ", "いぬそらやまかさはないすと", "ね"));
     // 「こね」「さらく」など辞書にない並び
     arrangeAs(game, "a", ["こね", "さらく", "くるま", "たぬき", "きつね"]);
     game.act("a", { type: "tsumo" });
     const v = game.viewFor("b");
+    expect(v.vote!.items.map((i) => i.text)).toEqual(["こね", "さらく"]);
     const bad = v.vote!.items.find((i) => i.text === "さらく")!;
     expect(bad.known).toBe(false);
     game.act("b", { type: "vote", votes: { [bad.id]: false } });
@@ -287,9 +283,6 @@ describe("自己申告", () => {
     expect(game.viewFor("a").notice).toContain("ロン");
     // 「さく」は5番目の組（index 4）、末尾に入れて「さくら」
     expect(game.act("b", { type: "ronPlace", group: 4, pos: 2 })).toBeNull();
-    const va = game.viewFor("a");
-    expect(va.phase).toBe("vote");
-    game.act("a", { type: "vote", votes: {} });
     expect(game.viewFor("a").result?.kind).toBe("agari");
   });
 
@@ -332,8 +325,6 @@ describe("自己申告", () => {
     game.act("a", { type: "discard", tileId: game.viewFor("a").myHand.find((t) => t.ch === "ぬ")!.id });
     expect(game.act("b", { type: "call", call: "ron" })).toBeNull();
     expect(game.act("b", { type: "ronPlace", group: 4, pos: 1 })).toBeNull();
-    expect(game.viewFor("a").phase).toBe("vote");
-    game.act("a", { type: "vote", votes: {} });
     expect(game.viewFor("a").result?.kind).toBe("agari");
   });
 
@@ -375,7 +366,6 @@ describe("自己申告", () => {
     // 並びは「さくら・くるま・たぬき・いなり・ね」＋離れた「こ」。並べ替えはできないので、入れる場所を一緒に送る
     expect(game.act("a", { type: "tsumo" })).not.toBeNull();
     expect(game.act("a", { type: "tsumo", place: { group: 4, pos: 1 } })).toBeNull();
-    game.act("b", { type: "vote", votes: {} });
     const r = game.viewFor("a").result!;
     expect(r.kind).toBe("agari");
     expect(r.wins[0].groups.map((x) => x.word)).toContain("ねこ");
@@ -569,7 +559,6 @@ describe("理牌タイム", () => {
     expect(v.actions?.kind === "turn" && v.actions.canTsumo).toBe(true);
     // 理牌した形のまま天和を宣言できる
     game.act("a", { type: "tsumo" });
-    game.act("b", { type: "vote", votes: {} });
     expect(game.viewFor("a").result?.wins[0].yaku.map((y) => y.name)).toContain("天和");
   });
 });

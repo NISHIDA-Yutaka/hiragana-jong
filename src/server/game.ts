@@ -1001,9 +1001,10 @@ export class Game {
     else {
       const lx = this.lex(seat);
       const words = [...comp!.hand.map((g) => g.word), ...hp.melds.map((m) => m.word)];
+      // 辞書（ルーム辞書を含む）にある語はそのまま認め、辞書にない語だけを投票にかける
       for (const w of [...new Set(words)]) {
-        const known = !!lx.lookup(w)?.verified;
-        items.push({ id: iid++, kind: "word", text: w, known, detail: known ? "辞書にあります" : "辞書にない語です" });
+        if (lx.lookup(w)?.verified) continue;
+        items.push({ id: iid++, kind: "word", text: w, known: false, detail: "辞書にない語です。言葉として認めますか？" });
       }
     }
     if (theme) {

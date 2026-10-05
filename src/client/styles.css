@@ -637,6 +637,15 @@ fieldset:disabled .seg button:not(.on) {
   font-weight: 700;
   font-size: 15px;
 }
+.chip-ok {
+  background: #dff3e4;
+  color: #1d5a33;
+}
+.chip-ask {
+  background: #ffe6c7;
+  color: #7a3d00;
+  font-weight: 700;
+}
 .chip button {
   border: 0;
   background: none;
