@@ -2,7 +2,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { CallOption, GameEvent, GameView } from "../../shared/protocol";
 import { emit, lsGet, lsSet, send, toast, useStore } from "../net";
-import { callSound, clack, gameStart, prefs, riichiSound, riipaiStart, say, setPref, shuffle, tick } from "../sound";
+import { callSound, chime, clack, prefs, riichiSound, riipaiStart, say, setPref, shuffle, tick } from "../sound";
 import { ChatFlow } from "./ChatFlow";
 import { CallDetailDialog, PlaceDialog, toGroups, TsumoDialog } from "./Declare";
 import { Hand } from "./Hand";
@@ -90,7 +90,7 @@ export function Table() {
       if (e.type === "start") {
         shuffle();
         // 理牌なしならそのまま対局が始まる
-        if (!g.riipai) setTimeout(gameStart, 600);
+        if (!g.riipai) setTimeout(chime, 600);
       }
       const text = CALL_TEXT[e.type];
       if (text) {
@@ -115,7 +115,7 @@ export function Table() {
     if (now === hadRiipai.current) return;
     hadRiipai.current = now;
     if (now) setTimeout(riipaiStart, 900);
-    else gameStart();
+    else chime();
   }, [g.riipai]);
 
   // 持ち時間表示

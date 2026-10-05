@@ -188,58 +188,6 @@ export function riipaiStart() {
   tone(1175, 0.18, 0.6, "sine", 0.1);
 }
 
-/** 太鼓の一打（ピッチが下がる低音＋皮を打つ雑音） */
-function taiko(c: AudioContext, t: number, vol: number) {
-  const o = c.createOscillator();
-  o.type = "sine";
-  o.frequency.setValueAtTime(150, t);
-  o.frequency.exponentialRampToValueAtTime(58, t + 0.22);
-  const g = c.createGain();
-  g.gain.setValueAtTime(0.0001, t);
-  g.gain.exponentialRampToValueAtTime(vol, t + 0.006);
-  g.gain.exponentialRampToValueAtTime(0.001, t + 0.55);
-  o.connect(g).connect(master!);
-  o.start(t);
-  o.stop(t + 0.6);
-  noiseHit(c, t, 0.05, 700, 0.8, vol * 0.5);
-}
-
-/** 明るい和音を「パーン」と鳴らす（金管っぽく、のこぎり波を低域通過で丸める） */
-function stab(c: AudioContext, t: number, freqs: number[], dur: number, vol: number) {
-  const lp = c.createBiquadFilter();
-  lp.type = "lowpass";
-  lp.frequency.setValueAtTime(5200, t);
-  lp.frequency.exponentialRampToValueAtTime(1400, t + dur);
-  const g = c.createGain();
-  g.gain.setValueAtTime(0.0001, t);
-  g.gain.exponentialRampToValueAtTime(vol, t + 0.02);
-  g.gain.setValueAtTime(vol, t + 0.08);
-  g.gain.exponentialRampToValueAtTime(0.001, t + dur);
-  lp.connect(g).connect(master!);
-  for (const f of freqs) {
-    for (const det of [-6, 6]) {
-      const o = c.createOscillator();
-      o.type = "sawtooth";
-      o.frequency.value = f;
-      o.detune.value = det;
-      o.connect(lp);
-      o.start(t);
-      o.stop(t + dur + 0.05);
-    }
-  }
-}
-
-/** 対局の始まり：太鼓の「ドドン」から明るい和音 */
-export function gameStart() {
-  const c = ac();
-  if (!c || !master) return;
-  const t = c.currentTime + 0.02;
-  taiko(c, t, 0.55);
-  taiko(c, t + 0.15, 0.8);
-  stab(c, t + 0.3, [523.25, 659.25, 783.99, 1046.5], 0.9, 0.07);
-  tone(2093, 0.32, 0.7, "sine", 0.05);
-}
-
 function tone(freq: number, start: number, dur: number, type: OscillatorType = "triangle", vol = 0.2) {
   const c = ac();
   if (!c || !master) return;
@@ -256,7 +204,7 @@ function tone(freq: number, start: number, dur: number, type: OscillatorType = "
   o.stop(t + dur + 0.05);
 }
 
-/** 以前の配牌の「ピンポン」（試聴ページ用に残している） */
+/** 対局の始まりの「ピンポン」 */
 export function chime() {
   tone(880, 0, 0.25, "sine", 0.15);
   tone(1320, 0.08, 0.35, "sine", 0.12);

@@ -1,11 +1,10 @@
 // 効果音の試聴ページ（開発中だけ /sounds で開ける）
-import { callSound, chime, clack, fanfare, gameStart, riichiSound, riipaiStart, say, shuffle, tick, tilePick, tilePlace } from "./sound";
+import { callSound, chime, clack, fanfare, riichiSound, riipaiStart, say, shuffle, tick, tilePick, tilePlace } from "./sound";
 
 const SOUNDS: [string, string, () => void][] = [
   ["配牌", "haipai.wav", shuffle],
   ["理牌の始まり", "ポロン", riipaiStart],
-  ["対局の始まり（新）", "ドドン＋和音", gameStart],
-  ["対局の始まり（代用案）", "以前の配牌のピンポン", chime],
+  ["対局の始まり", "ピンポン", chime],
   ["牌をつまむ", "tumamu.wav", tilePick],
   ["牌を置く（並べ直し）", "oku.mp3", tilePlace],
   ["打牌", "dahai.wav", () => clack()],
