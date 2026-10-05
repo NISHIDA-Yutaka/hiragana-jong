@@ -121,6 +121,7 @@ export function Lobby() {
                   [8, "8秒"],
                   [10, "10秒"],
                   [12, "12秒"],
+                  [0, "無制限"],
                 ]}
                 onChange={(v) => set({ callSeconds: v as RoomSettings["callSeconds"] })}
               />
@@ -149,36 +150,6 @@ export function Lobby() {
                 onChange={(v) => set({ timer: v as RoomSettings["timer"] })}
               />
             </Row>
-            <Row label="辞書">
-              <Seg
-                value={s.dictLevel}
-                options={[
-                  ["full", "広い（約20万語）"],
-                  ["common", "常用語のみ（約2万語）"],
-                ]}
-                onChange={(v) => set({ dictLevel: v as RoomSettings["dictLevel"] })}
-              />
-            </Row>
-            <Row label="鳴き">
-              <Seg
-                value={s.calls ? "on" : "off"}
-                options={[
-                  ["on", "ポン・カンあり"],
-                  ["off", "なし"],
-                ]}
-                onChange={(v) => set({ calls: v === "on" })}
-              />
-            </Row>
-            <Row label="清音代用">
-              <Seg
-                value={s.seion ? "on" : "off"}
-                options={[
-                  ["off", "なし"],
-                  ["on", "あり（かき→かぎ 等）"],
-                ]}
-                onChange={(v) => set({ seion: v === "on" })}
-              />
-            </Row>
             <Row label="追加牌">
               <Seg
                 value={s.extraTiles ? "on" : "off"}
@@ -189,16 +160,54 @@ export function Lobby() {
                 onChange={(v) => set({ extraTiles: v === "on" })}
               />
             </Row>
-            <Row label="否決時">
-              <Seg
-                value={s.rejectPenalty}
-                options={[
-                  ["cancel", "取り消しのみ"],
-                  ["chombo", "チョンボ（満貫払い）"],
-                ]}
-                onChange={(v) => set({ rejectPenalty: v as RoomSettings["rejectPenalty"] })}
-              />
-            </Row>
+            <details className="set-more">
+              <summary>
+                その他のルール
+                <small>
+                  辞書{s.dictLevel === "full" ? "広い" : "常用語"}・鳴き{s.calls ? "あり" : "なし"}・清音代用{s.seion ? "あり" : "なし"}・否決時{s.rejectPenalty === "chombo" ? "チョンボ" : "取り消し"}
+                </small>
+              </summary>
+              <Row label="辞書">
+                <Seg
+                  value={s.dictLevel}
+                  options={[
+                    ["full", "広い（約20万語）"],
+                    ["common", "常用語のみ（約2万語）"],
+                  ]}
+                  onChange={(v) => set({ dictLevel: v as RoomSettings["dictLevel"] })}
+                />
+              </Row>
+              <Row label="鳴き">
+                <Seg
+                  value={s.calls ? "on" : "off"}
+                  options={[
+                    ["on", "ポン・カンあり"],
+                    ["off", "なし"],
+                  ]}
+                  onChange={(v) => set({ calls: v === "on" })}
+                />
+              </Row>
+              <Row label="清音代用">
+                <Seg
+                  value={s.seion ? "on" : "off"}
+                  options={[
+                    ["off", "なし"],
+                    ["on", "あり（かき→かぎ 等）"],
+                  ]}
+                  onChange={(v) => set({ seion: v === "on" })}
+                />
+              </Row>
+              <Row label="否決時">
+                <Seg
+                  value={s.rejectPenalty}
+                  options={[
+                    ["cancel", "取り消しのみ"],
+                    ["chombo", "チョンボ（満貫払い）"],
+                  ]}
+                  onChange={(v) => set({ rejectPenalty: v as RoomSettings["rejectPenalty"] })}
+                />
+              </Row>
+            </details>
           </fieldset>
           {host ? (
             <button className="btn btn-primary btn-big start-btn" onClick={start}>

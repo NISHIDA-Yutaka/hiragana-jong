@@ -652,9 +652,12 @@ export class Game {
       if (this.players[cs.seat].isBot) this.setTimer(`bot-call-${cs.seat}`, this.botDelay(300, 700), () => this.botCall(cs.seat));
     }
     if ([...this.calls.values()].some((c) => !this.players[c.seat].isBot)) {
-      const ms = this.fast ? 0 : this.settings.callSeconds * 1000;
-      this.windowDeadline = now + ms;
-      this.setTimer("window", ms, () => this.closeWindow());
+      // 無制限（0秒）のときは、全員が応答するまで締め切らない
+      if (this.fast || this.settings.callSeconds > 0) {
+        const ms = this.fast ? 0 : this.settings.callSeconds * 1000;
+        this.windowDeadline = now + ms;
+        this.setTimer("window", ms, () => this.closeWindow());
+      } else this.windowDeadline = null;
     }
   }
 

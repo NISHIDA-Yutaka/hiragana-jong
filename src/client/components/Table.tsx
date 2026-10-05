@@ -3,6 +3,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { CallOption, GameEvent, GameView } from "../../shared/protocol";
 import { emit, lsGet, lsSet, send, toast, useStore } from "../net";
 import { callSound, chime, clack, prefs, riichiSound, say, setPref, tick } from "../sound";
+import { ChatFlow } from "./ChatFlow";
 import { CallDetailDialog, PlaceDialog, toGroups, TsumoDialog } from "./Declare";
 import { Hand } from "./Hand";
 import { FinalModal, ResultModal, VoteModal } from "./Overlays";
@@ -63,6 +64,7 @@ export function Table() {
   const [chooser, setChooser] = useState<null | { title: string; options: CallOption[]; onPick: (o: CallOption) => void }>(null);
   const [auto, setAuto] = useState(() => lsGet("auto", { tsumogiri: false }));
   const [oneClick, setOneClick] = useState(() => lsGet("oneClick", false));
+  const [chatFlow, setChatFlow] = useState(() => lsGet("chatFlow", true));
   const [tsumoOpen, setTsumoOpen] = useState(false);
   const [sakuPlace, setSakuPlace] = useState(false);
   const [, force] = useState(0);
@@ -188,6 +190,8 @@ export function Table() {
           ))}
         </div>
 
+        {chatFlow && <ChatFlow />}
+
         {g.seats.map((s) => (
           <NamePlate key={s.seat} s={s} pos={posFor(s.seat, me, g.n)} isTurn={g.turn === s.seat && (g.phase === "play" || g.phase === "calls")} />
         ))}
@@ -272,6 +276,17 @@ export function Table() {
                       }}
                     />
                     1クリックで打牌する
+                  </label>
+                  <label className="check">
+                    <input
+                      type="checkbox"
+                      checked={chatFlow}
+                      onChange={(e) => {
+                        setChatFlow(e.target.checked);
+                        lsSet("chatFlow", e.target.checked);
+                      }}
+                    />
+                    チャットを卓に流す
                   </label>
                   {room.isHost && (
                     <button

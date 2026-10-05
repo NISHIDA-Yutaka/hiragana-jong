@@ -21,8 +21,8 @@ export interface RoomSettings {
   calls: boolean;
   /** 投票で否決されたとき：cancel=取り消しのみ / chombo=チョンボ（満貫払い） */
   rejectPenalty: "cancel" | "chombo";
-  /** 打牌のあとロン・ポン・カンを受け付ける秒数 */
-  callSeconds: 5 | 8 | 10 | 12;
+  /** 打牌のあとロン・ポン・カンを受け付ける秒数。0=無制限（全員が応答するまで待つ） */
+  callSeconds: 0 | 5 | 8 | 10 | 12;
   /** 局の始めに全員で理牌する時間（秒）。0=なし */
   riipaiSeconds: 0 | 60 | 180 | 300;
 }
@@ -36,7 +36,7 @@ export const DEFAULT_SETTINGS: RoomSettings = {
   timer: "normal",
   calls: true,
   rejectPenalty: "chombo",
-  callSeconds: 5,
+  callSeconds: 12,
   riipaiSeconds: 180,
 };
 
