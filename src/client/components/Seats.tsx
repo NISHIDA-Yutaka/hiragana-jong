@@ -34,22 +34,29 @@ export function Meld({ m, size = "sm", glyph = 0 }: { m: MeldView; size?: TileSi
  * 右の席は列が画面の上へ、正面の席は段が画面の上へ伸びるため、その向きだけ順番を逆にする
  */
 function discardZ(pos: Pos, row: number, col: number): number {
-  if (pos === "right") return 10 - col;
+  if (pos === "right") return 40 - col;
   if (pos === "top") return 10 - row;
   return 1;
 }
 
-export function SeatZone({ s, pos, isMe, lastDiscardId, isTurn }: { s: SeatView; pos: Pos; isMe: boolean; lastDiscardId: number | null; isTurn: boolean }) {
+/**
+ * 1段に並べる捨て牌の数。山が長い少人数ほど1人の捨て牌が多い（4人で最大約18〜25枚、3人で約28〜38枚、2人で約48〜63枚）。
+ * 3人打ちは持ち主から見て右（空いている卓の角）へ伸ばし、2人打ちは左右の席が空いているので横長にする
+ */
+const PER_ROW: Record<number, number> = { 4: 6, 3: 10, 2: 16 };
+
+export function SeatZone({ n, s, pos, isMe, lastDiscardId, isTurn }: { n: number; s: SeatView; pos: Pos; isMe: boolean; lastDiscardId: number | null; isTurn: boolean }) {
   const a = ANGLE[pos];
   const g = -a;
+  const perRow = PER_ROW[n] ?? 6;
   const rows: (typeof s.discards)[] = [];
   s.discards.forEach((d, i) => {
-    const r = Math.min(Math.floor(i / 6), 3);
+    const r = Math.min(Math.floor(i / perRow), 3);
     (rows[r] ??= []).push(d);
   });
   return (
     <div className={`zone zone-${pos}`} style={{ transform: `rotate(${a}deg)` }}>
-      <div className="discards">
+      <div className={`discards discards-${n}p`}>
         {rows.map((row, ri) => (
           <div key={ri} className="drow">
             {row.map((d, di) => (

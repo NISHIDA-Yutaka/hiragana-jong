@@ -2301,6 +2301,18 @@ fieldset:disabled .seg button:not(.on) {
 .table-3d .riichi-stick {
   top: 116px;
 }
+/* 3人打ちの河は1段10枚で、持ち主から見て右（空いている卓の角）へ伸ばす */
+.discards-3p {
+  width: 400px;
+}
+/* 2人打ちの河は1段16枚の横長にして、中央にそろえる */
+.discards-2p {
+  width: 640px;
+  left: -320px;
+}
+.table-3d .discards-2p {
+  left: -371px;
+}
 /* 他家の手牌は卓の上に立て、実際の卓と同じく持ち主側へ少し傾ける（卓の中央＝カメラ側に背が見える） */
 .table-3d .backs {
   transform-origin: 50% 100%;

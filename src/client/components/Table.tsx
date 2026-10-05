@@ -181,7 +181,7 @@ export function Table() {
           <div className="table-square">
             <CenterBox g={g} mySeat={me} />
             {g.seats.map((s) => (
-              <SeatZone key={s.seat} s={s} pos={posFor(s.seat, me, g.n)} isMe={!spectator && s.seat === me} lastDiscardId={g.lastDiscard?.seat === s.seat ? g.lastDiscard.tileId : null} isTurn={g.turn === s.seat} />
+              <SeatZone key={s.seat} n={g.n} s={s} pos={posFor(s.seat, me, g.n)} isMe={!spectator && s.seat === me} lastDiscardId={g.lastDiscard?.seat === s.seat ? g.lastDiscard.tileId : null} isTurn={g.turn === s.seat} />
             ))}
           </div>
         </div>
