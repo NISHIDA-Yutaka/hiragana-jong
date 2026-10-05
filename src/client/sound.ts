@@ -62,6 +62,93 @@ export function clack(strength = 1) {
   o.stop(t + 0.12);
 }
 
+/** 短い雑音（牌の当たる「カッ」の成分） */
+function noiseHit(c: AudioContext, t: number, len: number, freq: number, q: number, vol: number) {
+  const buf = c.createBuffer(1, Math.floor(c.sampleRate * len), c.sampleRate);
+  const d = buf.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 4);
+  const src = c.createBufferSource();
+  src.buffer = buf;
+  const bp = c.createBiquadFilter();
+  bp.type = "bandpass";
+  bp.frequency.value = freq;
+  bp.Q.value = q;
+  const g = c.createGain();
+  g.gain.setValueAtTime(vol, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + len);
+  src.connect(bp).connect(g).connect(master!);
+  src.start(t);
+}
+
+/** 減衰する正弦波（木や牌の胴鳴り） */
+function body(c: AudioContext, t: number, f0: number, f1: number, dur: number, vol: number) {
+  const o = c.createOscillator();
+  o.type = "sine";
+  o.frequency.setValueAtTime(f0, t);
+  o.frequency.exponentialRampToValueAtTime(f1, t + dur * 0.6);
+  const g = c.createGain();
+  g.gain.setValueAtTime(vol, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  o.connect(g).connect(master!);
+  o.start(t);
+  o.stop(t + dur + 0.02);
+}
+
+/** 手牌をつまんだ「コトッ」 */
+export function tilePick() {
+  const c = ac();
+  if (!c || !master) return;
+  const t = c.currentTime;
+  noiseHit(c, t, 0.025, 3200 + Math.random() * 300, 2, 0.45);
+  body(c, t, 1150 + Math.random() * 80, 820, 0.07, 0.22);
+}
+
+/** 手牌を並べ直して置いた「コッ」（つまむ音より低く柔らかく） */
+export function tilePlace() {
+  const c = ac();
+  if (!c || !master) return;
+  const t = c.currentTime;
+  noiseHit(c, t, 0.03, 2300 + Math.random() * 300, 1.6, 0.4);
+  body(c, t, 640 + Math.random() * 60, 380, 0.09, 0.25);
+}
+
+/** 配牌の「ジャラジャラ」：牌が当たる音をばらばらに重ねる */
+export function shuffle() {
+  const c = ac();
+  if (!c || !master) return;
+  const t0 = c.currentTime;
+  for (let i = 0; i < 26; i++) {
+    const t = t0 + Math.random() * 1.0 + (i < 6 ? 0 : 0.05);
+    const v = 0.12 + Math.random() * 0.22;
+    noiseHit(c, t, 0.02 + Math.random() * 0.02, 2000 + Math.random() * 2200, 1.5, v);
+    if (Math.random() < 0.5) body(c, t, 500 + Math.random() * 700, 300, 0.05, v * 0.4);
+  }
+}
+
+/** 理牌の始まり：やわらかい「ポロン」 */
+export function riipaiStart() {
+  tone(587, 0, 0.35, "sine", 0.13);
+  tone(880, 0.09, 0.4, "sine", 0.12);
+  tone(1175, 0.18, 0.6, "sine", 0.1);
+}
+
+/** 対局の始まり：拍子木の「カン、カン」 */
+export function hyoshigi() {
+  const c = ac();
+  if (!c || !master) return;
+  const t0 = c.currentTime;
+  for (const [dt, v] of [
+    [0, 1],
+    [0.32, 0.85],
+  ] as const) {
+    const t = t0 + dt;
+    noiseHit(c, t, 0.04, 2600, 3, 0.6 * v);
+    body(c, t, 1960, 1900, 0.35, 0.16 * v);
+    body(c, t, 3050, 3000, 0.22, 0.07 * v);
+    body(c, t, 980, 960, 0.18, 0.08 * v);
+  }
+}
+
 function tone(freq: number, start: number, dur: number, type: OscillatorType = "triangle", vol = 0.2) {
   const c = ac();
   if (!c || !master) return;
@@ -76,11 +163,6 @@ function tone(freq: number, start: number, dur: number, type: OscillatorType = "
   o.connect(g).connect(master);
   o.start(t);
   o.stop(t + dur + 0.05);
-}
-
-export function chime() {
-  tone(880, 0, 0.25, "sine", 0.15);
-  tone(1320, 0.08, 0.35, "sine", 0.12);
 }
 
 export function tick() {

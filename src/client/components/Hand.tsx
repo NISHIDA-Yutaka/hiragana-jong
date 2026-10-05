@@ -4,6 +4,7 @@ import { Arrangement, groupIds } from "../../shared/arrange";
 import { charOrder, normalizeInput, Tile as TileT } from "../../shared/tiles";
 import { send, toast } from "../net";
 import { shapeLabel } from "../shape";
+import { tilePick, tilePlace } from "../sound";
 import { Tile } from "./Tile";
 
 interface Props {
@@ -138,6 +139,7 @@ export function Hand({ hand, serverArr, drawnId, locked, discardable, highlight,
   const onDown = (e: RPointerEvent<HTMLDivElement>, id: number) => {
     if (e.button !== 0) return;
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    tilePick();
     setDrag({ id, x0: e.clientX, y0: e.clientY, dx: 0, dy: 0, active: false });
   };
   const onMove = (e: RPointerEvent<HTMLDivElement>) => {
@@ -165,6 +167,7 @@ export function Hand({ hand, serverArr, drawnId, locked, discardable, highlight,
       return;
     }
     dropAt(d.id, e.clientX);
+    tilePlace();
   };
 
   const clickTile = (id: number) => {

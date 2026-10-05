@@ -2,7 +2,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { CallOption, GameEvent, GameView } from "../../shared/protocol";
 import { emit, lsGet, lsSet, send, toast, useStore } from "../net";
-import { callSound, chime, clack, prefs, riichiSound, say, setPref, tick } from "../sound";
+import { callSound, clack, hyoshigi, prefs, riichiSound, riipaiStart, say, setPref, shuffle, tick } from "../sound";
 import { ChatFlow } from "./ChatFlow";
 import { CallDetailDialog, PlaceDialog, toGroups, TsumoDialog } from "./Declare";
 import { Hand } from "./Hand";
@@ -68,7 +68,9 @@ export function Table() {
   const [tsumoOpen, setTsumoOpen] = useState(false);
   const [sakuPlace, setSakuPlace] = useState(false);
   const [, force] = useState(0);
-  const lastSeq = useRef<number>(Math.max(0, ...g.events.map((e) => e.seq)));
+  // 対局画面は配牌と同時に開くので、開いた時点の最後の出来事が配牌なら、その音（配牌・理牌の始まり）も鳴らす
+  const [justDealt] = useState(() => g.events[g.events.length - 1]?.type === "start");
+  const lastSeq = useRef<number>(Math.max(0, ...g.events.map((e) => e.seq)) - (justDealt ? 1 : 0));
   const unreadChat = useUnreadChat(panel === "chat");
 
   const setAutoK = (k: keyof typeof auto, v: boolean) => {
@@ -85,7 +87,11 @@ export function Table() {
     for (const e of fresh) {
       const pos = posFor(e.seat, me, g.n);
       if (e.type === "discard") clack();
-      if (e.type === "start") chime();
+      if (e.type === "start") {
+        shuffle();
+        // 理牌なしならそのまま対局が始まる
+        if (!g.riipai) setTimeout(hyoshigi, 1100);
+      }
       const text = CALL_TEXT[e.type];
       if (text) {
         if (e.type === "riichi") riichiSound();
@@ -101,6 +107,16 @@ export function Table() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [g.events]);
+
+  // 理牌の始まりと終わり（対局の始まり）の音
+  const hadRiipai = useRef(justDealt ? false : !!g.riipai);
+  useEffect(() => {
+    const now = !!g.riipai;
+    if (now === hadRiipai.current) return;
+    hadRiipai.current = now;
+    if (now) setTimeout(riipaiStart, 900);
+    else hyoshigi();
+  }, [g.riipai]);
 
   // 持ち時間表示
   useEffect(() => {
