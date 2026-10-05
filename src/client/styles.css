@@ -708,13 +708,6 @@ fieldset:disabled .seg button:not(.on) {
   font-size: 15px;
   color: #f3e6c2;
 }
-.tc-num small {
-  font-size: 10.5px;
-  color: var(--muted);
-}
-.tc-gone {
-  opacity: 0.35;
-}
 /* 役一覧 */
 .yk-tools {
   display: flex;

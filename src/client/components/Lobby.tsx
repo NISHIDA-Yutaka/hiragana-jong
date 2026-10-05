@@ -231,7 +231,7 @@ export function Lobby() {
             {tab === "room" && <RoomWordsPanel lobby />}
             {tab === "tiles" && (
               <div className="panel-sec">
-                <TileCountList extraTiles={s.extraTiles} seen={null} />
+                <TileCountList extraTiles={s.extraTiles} />
               </div>
             )}
             {tab === "yaku" && <YakuPanel />}

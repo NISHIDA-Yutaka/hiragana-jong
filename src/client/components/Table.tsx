@@ -9,7 +9,7 @@ import { FinalModal, ResultModal, VoteModal } from "./Overlays";
 import { ChatPanel, MyWordsPanel, RoomWordsPanel, ThemePanel, YakuPanel } from "./Panels";
 import { CenterBox, Meld, NamePlate, Pos, posFor, SeatZone } from "./Seats";
 import { Tile } from "./Tile";
-import { seenCounts, TileCountList } from "./TileCount";
+import { TileCountList } from "./TileCount";
 
 const W = 1600;
 const H = 900;
@@ -234,7 +234,7 @@ export function Table() {
               {panel === "room" && <RoomWordsPanel />}
               {panel === "tiles" && (
                 <div className="panel-sec">
-                  <TileCountList extraTiles={room.settings.extraTiles} seen={seenCounts(g)} />
+                  <TileCountList extraTiles={room.settings.extraTiles} />
                 </div>
               )}
               {panel === "yaku" && <YakuPanel />}
