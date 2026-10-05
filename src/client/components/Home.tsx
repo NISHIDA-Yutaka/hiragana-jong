@@ -103,9 +103,6 @@ export function Home() {
           <button className="btn btn-ghost" onClick={() => setYakuOpen(true)}>
             役一覧
           </button>
-          <button className="btn btn-ghost" onClick={() => openYakuWindow(null)}>
-            別窓で開く
-          </button>
         </div>
       </div>
       {yakuOpen && (

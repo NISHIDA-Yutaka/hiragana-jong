@@ -302,8 +302,13 @@ select:focus {
   display: flex;
   gap: 8px;
 }
+.join-row .btn {
+  flex: none;
+}
 .code-input {
   flex: 1;
+  /* 入力欄は既定の幅より縮まないため、参加ボタンが押し出されていた */
+  min-width: 0;
   text-transform: uppercase;
   letter-spacing: 0.3em;
   font-size: 18px;
@@ -699,11 +704,15 @@ fieldset:disabled .seg button:not(.on) {
   overflow-y: auto;
   min-height: 0;
 }
+/* body はスクロールしない（対局画面用）ので、ページ自体をスクロールする箱にする */
 .yaku-page {
-  min-height: 100vh;
+  height: 100%;
+  overflow-y: auto;
+  padding: 18px 16px 30px;
+}
+.yaku-page-inner {
   max-width: 560px;
   margin: 0 auto;
-  padding: 18px 16px 30px;
 }
 .yaku-page-title {
   margin: 0 0 12px;

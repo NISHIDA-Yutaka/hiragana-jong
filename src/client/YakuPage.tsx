@@ -7,9 +7,11 @@ export function YakuPage() {
   document.title = "役一覧 - ひらがじゃん";
   return (
     <div className="yaku-page">
-      <h1 className="yaku-page-title">ひらがじゃん 役一覧</h1>
-      <div className="panel-sec yk">
-        <YakuList extraTiles={extraTiles} />
+      <div className="yaku-page-inner">
+        <h1 className="yaku-page-title">ひらがじゃん 役一覧</h1>
+        <div className="panel-sec yk">
+          <YakuList extraTiles={extraTiles} />
+        </div>
       </div>
     </div>
   );
