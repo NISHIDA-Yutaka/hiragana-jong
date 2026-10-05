@@ -1,4 +1,8 @@
 // 効果音（WebAudioで合成）と発声（音声合成）
+import dahaiUrl from "../../sounds/dahai.wav";
+import haipaiUrl from "../../sounds/haipai.wav";
+import okuUrl from "../../sounds/oku.mp3";
+import tumamuUrl from "../../sounds/tumamu.wav";
 import { lsGet, lsSet } from "./net";
 
 let ctx: AudioContext | null = null;
@@ -26,11 +30,60 @@ function ac(): AudioContext | null {
     }
   }
   if (ctx.state === "suspended") void ctx.resume();
+  if (!loading) loadSamples(ctx);
   return ctx;
 }
 
-/** 牌を置く「カチッ」 */
+// ---------------------------------------------------------------- 録音した効果音
+
+const SAMPLE_URLS = { dahai: dahaiUrl, haipai: haipaiUrl, oku: okuUrl, tumamu: tumamuUrl };
+type SampleName = keyof typeof SAMPLE_URLS;
+const samples: Partial<Record<SampleName, AudioBuffer>> = {};
+let loading = false;
+
+function loadSamples(c: AudioContext) {
+  loading = true;
+  for (const [name, url] of Object.entries(SAMPLE_URLS) as [SampleName, string][]) {
+    fetch(url)
+      .then((r) => r.arrayBuffer())
+      .then((b) => c.decodeAudioData(b))
+      .then((buf) => (samples[name] = buf))
+      .catch(() => {
+        /* 読めなければ合成音のまま */
+      });
+  }
+}
+
+/** 録音した音を鳴らす。まだ読み込めていなければ false（呼び出し側が合成音で代わりに鳴らす） */
+function sample(name: SampleName, vol = 1, vary = 0.04): boolean {
+  const c = ac();
+  const buf = samples[name];
+  if (!c || !master || !buf) return false;
+  const src = c.createBufferSource();
+  src.buffer = buf;
+  // 毎回少しだけ高さを揺らして、同じ音の繰り返しに聞こえにくくする
+  src.playbackRate.value = 1 + (Math.random() * 2 - 1) * vary;
+  const g = c.createGain();
+  g.gain.value = vol;
+  src.connect(g).connect(master);
+  src.start();
+  return true;
+}
+
+/** ページを開いた直後から鳴らせるよう、最初の操作で音の準備をしておく */
+if (typeof window !== "undefined") {
+  const warm = () => {
+    ac();
+    window.removeEventListener("pointerdown", warm);
+    window.removeEventListener("keydown", warm);
+  };
+  window.addEventListener("pointerdown", warm);
+  window.addEventListener("keydown", warm);
+}
+
+/** 打牌の音 */
 export function clack(strength = 1) {
+  if (sample("dahai", 0.9 * strength)) return;
   const c = ac();
   if (!c || !master) return;
   const t = c.currentTime;
@@ -94,8 +147,9 @@ function body(c: AudioContext, t: number, f0: number, f1: number, dur: number, v
   o.stop(t + dur + 0.02);
 }
 
-/** 手牌をつまんだ「コトッ」 */
+/** 手牌をつまんだ音 */
 export function tilePick() {
+  if (sample("tumamu", 0.9)) return;
   const c = ac();
   if (!c || !master) return;
   const t = c.currentTime;
@@ -103,8 +157,9 @@ export function tilePick() {
   body(c, t, 1150 + Math.random() * 80, 820, 0.07, 0.22);
 }
 
-/** 手牌を並べ直して置いた「コッ」（つまむ音より低く柔らかく） */
+/** 手牌を並べ直して置いた音 */
 export function tilePlace() {
+  if (sample("oku", 1)) return;
   const c = ac();
   if (!c || !master) return;
   const t = c.currentTime;
@@ -112,8 +167,9 @@ export function tilePlace() {
   body(c, t, 640 + Math.random() * 60, 380, 0.09, 0.25);
 }
 
-/** 配牌の「ジャラジャラ」：牌が当たる音をばらばらに重ねる */
+/** 配牌の音 */
 export function shuffle() {
+  if (sample("haipai", 0.9, 0)) return;
   const c = ac();
   if (!c || !master) return;
   const t0 = c.currentTime;
@@ -132,21 +188,56 @@ export function riipaiStart() {
   tone(1175, 0.18, 0.6, "sine", 0.1);
 }
 
-/** 対局の始まり：拍子木の「カン、カン」 */
-export function hyoshigi() {
+/** 太鼓の一打（ピッチが下がる低音＋皮を打つ雑音） */
+function taiko(c: AudioContext, t: number, vol: number) {
+  const o = c.createOscillator();
+  o.type = "sine";
+  o.frequency.setValueAtTime(150, t);
+  o.frequency.exponentialRampToValueAtTime(58, t + 0.22);
+  const g = c.createGain();
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(vol, t + 0.006);
+  g.gain.exponentialRampToValueAtTime(0.001, t + 0.55);
+  o.connect(g).connect(master!);
+  o.start(t);
+  o.stop(t + 0.6);
+  noiseHit(c, t, 0.05, 700, 0.8, vol * 0.5);
+}
+
+/** 明るい和音を「パーン」と鳴らす（金管っぽく、のこぎり波を低域通過で丸める） */
+function stab(c: AudioContext, t: number, freqs: number[], dur: number, vol: number) {
+  const lp = c.createBiquadFilter();
+  lp.type = "lowpass";
+  lp.frequency.setValueAtTime(5200, t);
+  lp.frequency.exponentialRampToValueAtTime(1400, t + dur);
+  const g = c.createGain();
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(vol, t + 0.02);
+  g.gain.setValueAtTime(vol, t + 0.08);
+  g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  lp.connect(g).connect(master!);
+  for (const f of freqs) {
+    for (const det of [-6, 6]) {
+      const o = c.createOscillator();
+      o.type = "sawtooth";
+      o.frequency.value = f;
+      o.detune.value = det;
+      o.connect(lp);
+      o.start(t);
+      o.stop(t + dur + 0.05);
+    }
+  }
+}
+
+/** 対局の始まり：太鼓の「ドドン」から明るい和音 */
+export function gameStart() {
   const c = ac();
   if (!c || !master) return;
-  const t0 = c.currentTime;
-  for (const [dt, v] of [
-    [0, 1],
-    [0.32, 0.85],
-  ] as const) {
-    const t = t0 + dt;
-    noiseHit(c, t, 0.04, 2600, 3, 0.6 * v);
-    body(c, t, 1960, 1900, 0.35, 0.16 * v);
-    body(c, t, 3050, 3000, 0.22, 0.07 * v);
-    body(c, t, 980, 960, 0.18, 0.08 * v);
-  }
+  const t = c.currentTime + 0.02;
+  taiko(c, t, 0.55);
+  taiko(c, t + 0.15, 0.8);
+  stab(c, t + 0.3, [523.25, 659.25, 783.99, 1046.5], 0.9, 0.07);
+  tone(2093, 0.32, 0.7, "sine", 0.05);
 }
 
 function tone(freq: number, start: number, dur: number, type: OscillatorType = "triangle", vol = 0.2) {
@@ -163,6 +254,12 @@ function tone(freq: number, start: number, dur: number, type: OscillatorType = "
   o.connect(g).connect(master);
   o.start(t);
   o.stop(t + dur + 0.05);
+}
+
+/** 以前の配牌の「ピンポン」（試聴ページ用に残している） */
+export function chime() {
+  tone(880, 0, 0.25, "sine", 0.15);
+  tone(1320, 0.08, 0.35, "sine", 0.12);
 }
 
 export function tick() {
