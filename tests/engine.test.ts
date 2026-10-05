@@ -144,7 +144,7 @@ function rigWall(h0: string, h1: string, draws: string): string[] {
   return [...head, ...rest];
 }
 
-function makeGame(wall: string[], opts: { myWords?: string[]; settings?: Partial<RoomSettings> } = {}) {
+function makeGame(wall: string[], opts: { myWords?: string[]; settings?: Partial<RoomSettings>; themeB?: { name: string; pure: boolean } } = {}) {
   const settings: RoomSettings = { ...DEFAULT_SETTINGS, playerCount: 2, timer: "none", judgeMode: "assist", riipaiSeconds: 0, ...opts.settings };
   const p1lex = opts.myWords ? lex.extend(opts.myWords.map((word) => ({ word, verified: false }))) : lex;
   const approved: string[] = [];
@@ -160,7 +160,7 @@ function makeGame(wall: string[], opts: { myWords?: string[]; settings?: Partial
       update: () => {},
       wordApproved: (w) => approved.push(w),
       playerLex: (id) => (id === "b" ? p1lex : lex),
-      theme: () => null,
+      theme: (id) => (id === "b" ? (opts.themeB ?? null) : null),
     },
   });
   game.start();
@@ -560,6 +560,62 @@ describe("作れる役の探索（役のバランス検証用）", () => {
 
   it("実際の役は「その役以上」で数える", () => {
     expect([...reachedFamilies(["三連", "同頭同尾", "金重言"])].sort()).toEqual(["三連", "二連", "同尾", "同言", "同頭", "同頭同尾", "重言"].sort());
+  });
+});
+
+describe("同種（宣言のみの役）だけでアガる", () => {
+  // B の手「いぬ・くるま・たぬき・かもめ・さく」は「ら」待ちで、同種のほかに役がない
+  const wall = () => rigWall("ららそやまはなほへれろわそ", "いぬくるまたぬきかもめさく", "とほへ");
+  const theme = { name: "生き物", pure: false };
+  /** 地和にならないよう、1巡回してから A が「ら」を捨てる */
+  const discardRa = (game: Game) => {
+    const pass = (id: string) => game.viewFor(id).actions?.kind === "call" && game.act(id, { type: "call", call: "pass" });
+    game.act("a", { type: "discard", tileId: game.viewFor("a").myHand.find((t) => t.ch === "そ")!.id });
+    pass("b");
+    game.act("b", { type: "discard", tileId: game.viewFor("b").drawnId! });
+    pass("a");
+    game.act("a", { type: "discard", tileId: game.viewFor("a").myHand.find((t) => t.ch === "ら")!.id });
+  };
+
+  for (const judgeMode of ["assist", "declare"] as const) {
+    it(`${judgeMode === "assist" ? "アシスト" : "自己申告"}：宣言していればロンでき、テーマが認められればアガリ`, () => {
+      const { game } = makeGame(wall(), { settings: { judgeMode }, themeB: theme });
+      arrangeAs(game, "b", ["いぬ", "くるま", "たぬき", "かもめ", "さく"]);
+      discardRa(game);
+      const v = game.viewFor("b");
+      expect(v.actions?.kind).toBe("call");
+      if (judgeMode === "assist") expect(v.actions?.kind === "call" && v.actions.ron).toBe(true);
+      expect(game.act("b", { type: "call", call: "ron" })).toBeNull();
+      if (judgeMode === "declare") expect(game.act("b", { type: "ronPlace", group: 4, pos: 2 })).toBeNull();
+      const va = game.viewFor("a");
+      expect(va.phase).toBe("vote");
+      expect(va.vote!.items.some((i) => i.kind === "theme")).toBe(true);
+      game.act("a", { type: "vote", votes: {} });
+      const r = game.viewFor("a").result!;
+      expect(r.kind).toBe("agari");
+      expect(r.wins[0].yaku.map((y) => y.name)).toContain("同種");
+    });
+  }
+
+  it("宣言していなければ、アシストではロンのボタンが出ない", () => {
+    const { game } = makeGame(wall(), { settings: { judgeMode: "assist" } });
+    arrangeAs(game, "b", ["いぬ", "くるま", "たぬき", "かもめ", "さく"]);
+    discardRa(game);
+    const v = game.viewFor("b");
+    expect(v.actions?.kind === "call" && v.actions.ron).toBeFalsy();
+  });
+
+  it("テーマが認められず役がなくなったときは、チョンボにせず取り消すだけ", () => {
+    const { game } = makeGame(wall(), { settings: { judgeMode: "declare" }, themeB: theme });
+    arrangeAs(game, "b", ["いぬ", "くるま", "たぬき", "かもめ", "さく"]);
+    discardRa(game);
+    game.act("b", { type: "call", call: "ron" });
+    game.act("b", { type: "ronPlace", group: 4, pos: 2 });
+    const item = game.viewFor("a").vote!.items.find((i) => i.kind === "theme")!;
+    game.act("a", { type: "vote", votes: { [item.id]: false } });
+    const v = game.viewFor("a");
+    expect(v.result).toBeNull();
+    expect(v.phase).toBe("play");
   });
 });
 

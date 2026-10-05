@@ -539,7 +539,8 @@ export class Game {
     if (this.declare) return this.declareTurnActions(seat, out);
     const comp = this.tsumoCompletion(seat);
     if (comp) {
-      const y = this.yakuFor(this.claimFor(seat, null, this.drawnTile(seat), comp), true);
+      // 同種を宣言していれば、それも役として数える（認められるかはアガリのときの投票で決まる）
+      const y = this.yakuFor(this.claimFor(seat, null, this.drawnTile(seat), comp));
       out.canTsumo = y.mainHan >= 1;
     }
     // 作文：14牌を区切らずに1つの組として並べたとき
@@ -749,7 +750,7 @@ export class Game {
       const comp = completeWith(groups, tile, hp.melds.length, chk);
       if (comp) {
         const furiten = this.isFuriten(seat, tile.ch);
-        const y = this.yakuFor(this.claimFor(seat, this.lastDiscard!.seat, tile, comp), true);
+        const y = this.yakuFor(this.claimFor(seat, this.lastDiscard!.seat, tile, comp));
         if (y.mainHan >= 1) {
           if (furiten) ronMissed = true;
           else ron = comp;
@@ -1670,7 +1671,7 @@ export class Game {
         const comp = this.tsumoCompletion(seat);
         if (!comp) return "アガリ形になっていません";
         const claim = this.claimFor(seat, null, this.drawnTile(seat), comp);
-        if (this.yakuFor(claim, true).mainHan < 1) return "役がありません";
+        if (this.yakuFor(claim).mainHan < 1) return "役がありません";
         this.clearTimer("turn");
         this.consumeBank(seat, this.turnStartedAt);
         this.declareWins([claim]);
