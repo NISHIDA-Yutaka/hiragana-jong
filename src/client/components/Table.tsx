@@ -183,6 +183,8 @@ export function Table() {
   const isMyTurn = g.turn === me && !spectator;
   const myMelds = me4?.melds ?? [];
   // 区切らずに並べた13枚へのロンは作文
+  // 結果画面の鍵：その局を終わらせた出来事の番号（誰かがOKを押して状態が届いても作り直さない）
+  const resultKey = Math.max(0, ...g.events.filter((e) => ["ron", "tsumo", "ryuukyoku", "abort", "chombo"].includes(e.type)).map((e) => e.seq));
   const ronSentence = actions?.kind === "ronPlace" && myMelds.length === 0 && g.myHand.length === 13 && toGroups(g.arrangement, g.myHand).length === 1;
 
   return (
@@ -537,7 +539,7 @@ export function Table() {
         />
       )}
       {g.phase === "vote" && g.vote && <VoteModal g={g} />}
-      {g.phase === "result" && g.result && <ResultModal g={g} />}
+      {g.phase === "result" && g.result && <ResultModal key={resultKey} g={g} />}
       {g.phase === "final" && g.final && <FinalModal g={g} />}
     </div>
   );

@@ -2,7 +2,7 @@
 import { FormEvent, PointerEvent as RPointerEvent, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Arrangement, groupIds } from "../../shared/arrange";
 import { charOrder, normalizeInput, Tile as TileT } from "../../shared/tiles";
-import { send, toast } from "../net";
+import { send, toast, useStore } from "../net";
 import { shapeLabel } from "../shape";
 import { tilePick, tilePlace } from "../sound";
 import { Tile } from "./Tile";
@@ -250,11 +250,13 @@ export function Hand({ hand, serverArr, drawnId, locked, discardable, highlight,
   }, [orderKey, handKey]);
 
   const groups = groupIds(cur);
+  const chiitoi = useStore((s) => !!s.room?.settings.chiitoi);
   const lastGroup = groups[groups.length - 1];
   const chOf = new Map(hand.map((t) => [t.id, t.ch]));
   const shape = shapeLabel(
     groups.map((x) => x.map((id) => chOf.get(id) ?? "").join("")),
     meldCount,
+    chiitoi,
   );
   const drawnAlone = drawnId !== null && lastGroup?.length === 1 && lastGroup[0] === drawnId;
 

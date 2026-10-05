@@ -164,7 +164,7 @@ export function Lobby() {
               <summary>
                 その他のルール
                 <small>
-                  辞書{s.dictLevel === "full" ? "広い" : "常用語"}・鳴き{s.calls ? "あり" : "なし"}・清音代用{s.seion ? "あり" : "なし"}・否決時{s.rejectPenalty === "chombo" ? "チョンボ" : "取り消し"}
+                  辞書{s.dictLevel === "full" ? "広い" : "常用語"}・鳴き{s.calls ? "あり" : "なし"}・清音代用{s.seion ? "あり" : "なし"}・七対子{s.chiitoi ? "あり" : "なし"}・否決時{s.rejectPenalty === "chombo" ? "チョンボ" : "取り消し"}
                 </small>
               </summary>
               <Row label="辞書">
@@ -195,6 +195,16 @@ export function Lobby() {
                     ["on", "あり（かき→かぎ 等）"],
                   ]}
                   onChange={(v) => set({ seion: v === "on" })}
+                />
+              </Row>
+              <Row label="七対子">
+                <Seg
+                  value={s.chiitoi ? "on" : "off"}
+                  options={[
+                    ["off", "なし"],
+                    ["on", "あり（異なる2文字×7）"],
+                  ]}
+                  onChange={(v) => set({ chiitoi: v === "on" })}
                 />
               </Row>
               <Row label="否決時">

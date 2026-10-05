@@ -9,9 +9,12 @@ export class BotBrain {
   private seed: number;
   /** 種類ごとの「つながりやすさ」（その文字を含む語の数） */
   private conn: number[];
+  /** 七対子でアガれるルールか */
+  private chiitoi: boolean;
 
-  constructor(lex: Lexicon, seed: number) {
+  constructor(lex: Lexicon, seed: number, chiitoi = true) {
     this.lex = lex;
+    this.chiitoi = chiitoi;
     this.seed = seed || 1;
     this.conn = new Array(NUM_KINDS).fill(0);
     for (let k = 0; k < NUM_KINDS; k++) {
@@ -71,7 +74,7 @@ export class BotBrain {
     const c = countsOf(hand.map((t) => t.ch));
     const std = enumerateStandard(c, 1, 4 - meldCount, this.lex, 1);
     if (std.length) return this.toArrangement(std[0], hand, false);
-    if (meldCount === 0) {
+    if (this.chiitoi && meldCount === 0) {
       const ch = enumerateChiitoi(c, this.lex, 1);
       if (ch.length) return this.toArrangement(ch[0], hand, true);
     }
@@ -81,14 +84,14 @@ export class BotBrain {
   /** 13-3m 枚のテンパイの並び（待ちが一番多く残っている形） */
   private tenpaiArrangement(hand: Tile[], meldCount: number, visible: Int8Array): Arrangement | null {
     const c = countsOf(hand.map((t) => t.ch));
-    const waits = waitsOf(c, meldCount, this.lex);
+    const waits = waitsOf(c, meldCount, this.lex, this.chiitoi);
     if (waits.length === 0) return null;
     waits.sort((a, b) => this.lex.supply[b] - visible[b] - (this.lex.supply[a] - visible[a]));
     for (const w of waits) {
       c[w]++;
       let keys = enumerateStandard(c, 1, 4 - meldCount, this.lex, 1)[0];
       let chiitoi = false;
-      if (!keys && meldCount === 0) {
+      if (!keys && this.chiitoi && meldCount === 0) {
         keys = enumerateChiitoi(c, this.lex, 1)[0];
         chiitoi = true;
       }
@@ -108,7 +111,7 @@ export class BotBrain {
     let bestD = 99;
     for (const k of kinds) {
       c[k]--;
-      const d = distance(c, meldCount, this.lex);
+      const d = distance(c, meldCount, this.lex, this.chiitoi);
       c[k]++;
       // 同じ距離なら、つながりにくい文字・場に多く見えている文字を先に切る
       const score = this.conn[k] * 2 - visible[k] * 3 + c[k] * 4 + this.rnd() * 3;

@@ -141,18 +141,18 @@ export function enumerateStandard(c: Int8Array, need2: number, need3: number, le
 }
 
 /** 鳴き（ポン・カン）の数 m のとき、手牌の文字だけでアガリ形か */
-export function isAgariShape(c: Int8Array, meldCount: number, lex: Lexicon): boolean {
+export function isAgariShape(c: Int8Array, meldCount: number, lex: Lexicon, chiitoi = true): boolean {
   if (canStandard(c, 1, 4 - meldCount, lex)) return true;
-  return meldCount === 0 && canChiitoi(c, lex);
+  return chiitoi && meldCount === 0 && canChiitoi(c, lex);
 }
 
 /** 待ち（加えるとアガリ形になる牌の種類）。c は 13-3m 枚 */
-export function waitsOf(c: Int8Array, meldCount: number, lex: Lexicon): number[] {
+export function waitsOf(c: Int8Array, meldCount: number, lex: Lexicon, chiitoi = true): number[] {
   const out: number[] = [];
   for (let k = 0; k < NUM_KINDS; k++) {
     if (lex.supply[k] === 0 || c[k] >= lex.supply[k]) continue;
     c[k]++;
-    if (isAgariShape(c, meldCount, lex)) out.push(k);
+    if (isAgariShape(c, meldCount, lex, chiitoi)) out.push(k);
     c[k]--;
   }
   return out;
@@ -162,7 +162,7 @@ export function waitsOf(c: Int8Array, meldCount: number, lex: Lexicon): number[]
  * アガリまでに必要な牌の数（向聴数+1 に相当）。0 ならアガリ、1 ならテンパイ。
  * 完成した語・3文字語の一部（2牌）・単独の牌を枠に当てはめ、使える牌の最大数を探す。
  */
-export function distance(c: Int8Array, meldCount: number, lex: Lexicon): number {
+export function distance(c: Int8Array, meldCount: number, lex: Lexicon, chiitoi = true): number {
   const need3 = 4 - meldCount;
   const required = 2 + 3 * need3;
   const memo = new Map<string, number>();
@@ -204,7 +204,7 @@ export function distance(c: Int8Array, meldCount: number, lex: Lexicon): number 
     return best;
   };
   let d = required - dfs(1, need3, 0);
-  if (meldCount === 0) d = Math.min(d, chiitoiDistance(c, lex));
+  if (chiitoi && meldCount === 0) d = Math.min(d, chiitoiDistance(c, lex));
   return d;
 }
 

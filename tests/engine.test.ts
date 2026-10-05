@@ -328,7 +328,7 @@ describe("自己申告", () => {
     expect(game.viewFor("a").result?.kind).toBe("agari");
   });
 
-  it("ポンは押してから語を選ぶ。辞書にない語ならアガリ放棄", () => {
+  it("ポンは押してから語を選ぶ。辞書にない語でも鳴ける（アガったときに投票）", () => {
     const { game } = makeGame(rigWall("ららいぬそやまかはないすそ", "ねこさくくるまたぬききつと", "と"));
     arrangeAs(game, "b", ["さく", "ねこ", "くるま", "たぬき", "きつと"]);
     const ra = game.viewFor("a").myHand.find((t) => t.ch === "ら")!;
@@ -340,7 +340,7 @@ describe("自己申告", () => {
     expect(game.act("b", { type: "callDetail", tileIds: [sa, ku, ra.id] })).toBeNull();
     expect(game.viewFor("b").seats[1].melds[0].word).toBe("さくら");
 
-    // 辞書にない語でポン → 鳴けず、その局はツモもできない
+    // 辞書にない語でもポンできる
     const g2 = makeGame(rigWall("ららいぬそやまかはないすそ", "ねこさくくるまたぬききつと", "と")).game;
     arrangeAs(g2, "b", ["さく", "ねこ", "くるま", "たぬき", "きつと"]);
     const ra2 = g2.viewFor("a").myHand.find((t) => t.ch === "ら")!;
@@ -349,8 +349,8 @@ describe("自己申告", () => {
     const o = g2.viewFor("b").arrangement!.order;
     g2.act("b", { type: "callDetail", tileIds: [ra2.id, o[0], o[1]] });
     const vb = g2.viewFor("b");
-    expect(vb.seats[1].melds.length).toBe(0);
-    expect(vb.actions?.kind === "turn" && vb.actions.canTsumo).toBe(false);
+    expect(vb.seats[1].melds[0].word).toBe("らさく");
+    expect(vb.actions?.kind === "turn" && vb.actions.afterCall).toBe(true);
   });
 
   it("リーチ中のツモ：離れたツモ牌を頭に入れてアガれる（単騎待ち）", () => {
@@ -371,16 +371,27 @@ describe("自己申告", () => {
     expect(r.wins[0].groups.map((x) => x.word)).toContain("ねこ");
   });
 
-  it("七対子で同じ語を2組使うとアガれず、その理由を伝える", () => {
-    const { game } = makeGame(rigWall("やまうらうらくわふみもちこ", "いぬそらやまかさはないすと", "れ"));
+  /** 親の14枚を2文字ずつ7組に並べる */
+  function sevenPairs(text: string, settings: Partial<RoomSettings> = {}) {
+    const { game } = makeGame(rigWall(text.slice(0, 13), "いぬそらやまかさはないすと", text.slice(13)), { settings });
     const hand = game.viewFor("a").myHand;
     const used = new Set<number>();
-    const order = [..."やまうらうらくわふみもちこれ"].map((ch) => {
+    const order = [...text].map((ch) => {
       const t = hand.find((x) => x.ch === ch && !used.has(x.id))!;
       used.add(t.id);
       return t.id;
     });
     game.setArrangement("a", { order, breaks: [1, 3, 5, 7, 9, 11].map((i) => order[i]) });
+    return game;
+  }
+
+  it("七対子は既定ではアガリにならない（ルール設定であり）", () => {
+    expect(sevenPairs("やまうみくわふみもちこれいぬ").act("a", { type: "tsumo" })).toBe("アガリの形（2文字×1＋3文字×4）に並べてください");
+    expect(sevenPairs("やまうみくわふみもちこれいぬ", { chiitoi: true }).act("a", { type: "tsumo" })).toBeNull();
+  });
+
+  it("七対子で同じ語を2組使うとアガれず、その理由を伝える", () => {
+    const game = sevenPairs("やまうらうらくわふみもちこれ", { chiitoi: true });
     expect(game.act("a", { type: "tsumo" })).toContain("七対子は同じ語を2組使えません（「うら」");
   });
 

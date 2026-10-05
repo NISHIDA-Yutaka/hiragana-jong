@@ -14,6 +14,8 @@ export interface RoomSettings {
   dictLevel: "full" | "common";
   /** 清音代用（「かき」を「かぎ」と読むなど） */
   seion: boolean;
+  /** 七対子（異なる2文字の語×7）でアガれる */
+  chiitoi: boolean;
   /** 別売の追加牌（濁音・半濁音・小書き・ー）を混ぜる */
   extraTiles: boolean;
   timer: TimerPreset;
@@ -32,6 +34,7 @@ export const DEFAULT_SETTINGS: RoomSettings = {
   length: "tonpuu",
   dictLevel: "full",
   seion: false,
+  chiitoi: false,
   extraTiles: false,
   timer: "normal",
   calls: true,

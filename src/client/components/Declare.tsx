@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { Arrangement, groupIds } from "../../shared/arrange";
 import type { Tile as TileT } from "../../shared/tiles";
+import { useStore } from "../net";
 import { shapeLabel } from "../shape";
 import { Tile } from "./Tile";
 
@@ -47,9 +48,11 @@ export function PlaceDialog(props: {
   // 作文は14枚が1列に並ぶので小さめの牌にする
   const tsz = props.sentence ? "sm" : "md";
   const preview = groups.map((g, gi) => (pick && pick.g === gi ? [...g.slice(0, pick.p), extra, ...g.slice(pick.p)] : g));
+  const chiitoi = useStore((s) => !!s.room?.settings.chiitoi);
   const shape = shapeLabel(
     preview.map((g) => g.map((t) => t.ch).join("")),
     meldCount,
+    chiitoi,
   );
   const ok = !!pick && (props.sentence || shape.cls === "shape-win");
   return (
@@ -108,9 +111,11 @@ export function TsumoDialog({
   onConfirm: (insert: { tile: TileT; group: number; pos: number } | null) => void;
   onClose: () => void;
 }) {
+  const chiitoi = useStore((s) => !!s.room?.settings.chiitoi);
   const shape = shapeLabel(
     groups.map((g) => g.map((t) => t.ch).join("")),
     meldCount,
+    chiitoi,
   );
   if (shape.cls === "shape-win") {
     return (
@@ -165,7 +170,7 @@ export function TsumoDialog({
       <div className="modal declare">
         <div className="result-title small">ツモ</div>
         <p className="declare-lead">
-          手牌を「2文字×1＋3文字×4」（七対子なら異なる2文字×7）に区切ってから宣言してください。
+          手牌を「2文字×1＋3文字×4」{chiitoi ? "（七対子なら異なる2文字×7）" : ""}に区切ってから宣言してください。
           <br />
           今の形：{shape.text}
         </p>
@@ -211,7 +216,7 @@ export function CallDetailDialog({
       <div className="modal declare">
         <div className="result-title small">{label}する語</div>
         <p className="declare-lead">
-          {call === "pon" ? "2枚の組" : "3枚以上の組"}に <Tile ch={tile.ch} size="xs" /> を入れた語を選んでください。辞書にない語だと鳴けず、この局はアガリ放棄になります。
+          {call === "pon" ? "2枚の組" : "3枚以上の組"}に <Tile ch={tile.ch} size="xs" /> を入れた語を選んでください。辞書にない語は、アガったときに投票で確かめます。
           {left !== null && <b className="declare-left">{left}</b>}
         </p>
         {options.length === 0 ? (

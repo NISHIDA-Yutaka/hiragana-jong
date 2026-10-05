@@ -217,6 +217,7 @@ export class Room {
     if (s.length && ["tonpuu", "hanchan", "ikkyoku"].includes(s.length)) next.length = s.length;
     if (s.dictLevel && ["full", "common"].includes(s.dictLevel)) next.dictLevel = s.dictLevel;
     if (typeof s.seion === "boolean") next.seion = s.seion;
+    if (typeof s.chiitoi === "boolean") next.chiitoi = s.chiitoi;
     if (typeof s.extraTiles === "boolean") next.extraTiles = s.extraTiles;
     if (s.timer && ["fast", "normal", "slow", "none"].includes(s.timer)) next.timer = s.timer;
     if (typeof s.calls === "boolean") next.calls = s.calls;

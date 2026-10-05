@@ -54,7 +54,7 @@ export interface Completed {
 }
 
 /** 手牌の語（文字列）の組と鳴きの数から、アガリ形かを判定する */
-export function checkComplete(groups: { word: string; ids: number[] }[], meldCount: number, isWord: WordCheck): Completed | null {
+export function checkComplete(groups: { word: string; ids: number[] }[], meldCount: number, isWord: WordCheck, chiitoi = true): Completed | null {
   const unverified: string[] = [];
   for (const gr of groups) {
     const e = isWord(gr.word);
@@ -65,7 +65,7 @@ export function checkComplete(groups: { word: string; ids: number[] }[], meldCou
   const twos = lens.filter((l) => l === 2).length;
   const threes = lens.filter((l) => l === 3).length;
   if (twos === 1 && threes === 4 - meldCount && lens.length === 5 - meldCount) return { form: "standard", hand: groups, unverified };
-  if (meldCount === 0 && twos === 7 && lens.length === 7) {
+  if (chiitoi && meldCount === 0 && twos === 7 && lens.length === 7) {
     const ws = new Set(groups.map((g) => g.word));
     if (ws.size === 7) return { form: "chiitoi", hand: groups, unverified };
   }
@@ -81,6 +81,7 @@ export function completeWith(
   extra: { ch: string; id: number },
   meldCount: number,
   isWord: WordCheck,
+  chiitoi = true,
 ): Completed | null {
   let best: Completed | null = null;
   for (let gi = 0; gi < groups.length; gi++) {
@@ -89,7 +90,7 @@ export function completeWith(
       const w = [...chars.slice(0, p), extra.ch, ...chars.slice(p)].join("");
       const ids = [...groups[gi].ids.slice(0, p), extra.id, ...groups[gi].ids.slice(p)];
       const ng = groups.map((g, i) => (i === gi ? { word: w, ids } : g));
-      const r = checkComplete(ng, meldCount, isWord);
+      const r = checkComplete(ng, meldCount, isWord, chiitoi);
       if (r && (!best || r.unverified.length < best.unverified.length)) best = r;
     }
   }

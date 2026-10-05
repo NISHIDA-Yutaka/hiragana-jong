@@ -54,8 +54,6 @@ interface HP {
   called: boolean;
   drawnId: number | null;
   bank: number;
-  /** 誤った鳴きでこの局のアガリを放棄した */
-  noAgari: boolean;
 }
 
 interface CallState {
@@ -187,7 +185,7 @@ export class Game {
       ...p,
       score: rule.start,
       connected: true,
-      brain: p.isBot && p.botLex ? new BotBrain(p.botLex, (Date.now() + i * 7919) >>> 0) : undefined,
+      brain: p.isBot && p.botLex ? new BotBrain(p.botLex, (Date.now() + i * 7919) >>> 0, !!this.settings.chiitoi) : undefined,
     }));
     this.hooks = opts.hooks;
     this.fast = !!opts.fast;
@@ -362,7 +360,6 @@ export class Game {
       called: false,
       drawnId: null,
       bank,
-      noAgari: false,
     }));
     for (let r = 0; r < 13; r++) {
       for (let k = 0; k < this.n; k++) {
@@ -466,6 +463,11 @@ export class Game {
    * 作文の形：鳴きなしで、手牌を区切らずに1つの組にしている。
    * 14枚なら最後に1枚だけ離した形も可（その牌を文章のどこかに入れて宣言する）
    */
+  /** 七対子でアガれるルールか */
+  private get chiitoi() {
+    return !!this.settings.chiitoi;
+  }
+
   private sentenceShape(seat: number): { ids: number[]; extra: number | null } | null {
     const hp = this.hands[seat];
     if (hp.melds.length > 0) return null;
@@ -497,7 +499,7 @@ export class Game {
     const out: string[] = [];
     for (let k = 0; k < NUM_KINDS; k++) {
       if (lx.supply[k] === 0) continue;
-      if (completeWith(groups, { ch: KINDS[k], id: -1 }, hp.melds.length, chk)) out.push(KINDS[k]);
+      if (completeWith(groups, { ch: KINDS[k], id: -1 }, hp.melds.length, chk, this.chiitoi)) out.push(KINDS[k]);
     }
     return out;
   }
@@ -506,13 +508,13 @@ export class Game {
     const hp = this.hands[seat];
     const chk = this.check(seat);
     const m = hp.melds.length;
-    const full = checkComplete(this.handGroups(seat), m, chk);
+    const full = checkComplete(this.handGroups(seat), m, chk, this.chiitoi);
     if (full) return full;
     if (hp.drawnId === null) return null;
     const drawn = hp.hand.find((t) => t.id === hp.drawnId)!;
     const rest = hp.hand.filter((t) => t.id !== hp.drawnId);
     const groups = this.handGroups(seat, this.withoutId(hp.arr, drawn.id), rest);
-    return completeWith(groups, drawn, m, chk);
+    return completeWith(groups, drawn, m, chk, this.chiitoi);
   }
 
   private computeTurnActions(seat: number): Extract<ActionsView, { kind: "turn" }> {
@@ -535,8 +537,8 @@ export class Game {
   /** 自己申告：辞書で絞らず、形だけで出せる操作を並べる */
   private declareTurnActions(seat: number, out: Extract<ActionsView, { kind: "turn" }>) {
     const hp = this.hands[seat];
-    out.canTsumo = !hp.noAgari;
-    out.canSakubun = !hp.noAgari && this.canSakubun(seat);
+    out.canTsumo = true;
+    out.canSakubun = this.canSakubun(seat);
     const groups = this.handGroups(seat);
     if (!out.locked && this.totalKans() < 4) {
       let id = 0;
@@ -558,12 +560,6 @@ export class Game {
     }
     if (!hp.riichi && this.menzen(hp) && this.players[seat].score >= 1 && this.liveRemaining >= 4) out.riichiDiscards = hp.hand.map((t) => t.id);
     return out;
-  }
-
-  /** 誤った鳴き：鳴きは取り消し、その局はアガリ放棄 */
-  private mistakenCall(seat: number, word: string) {
-    this.hands[seat].noAgari = true;
-    this.emit("reject", seat, `「${word}」は辞書にないため鳴けません（この局はアガリ放棄）`);
   }
 
   private drawnTile(seat: number): Tile | null {
@@ -677,7 +673,7 @@ export class Game {
       // CPU は自分の語彙で並べているので、ロンも自分の語彙で判定する（部屋の全辞書だと人より強くなりすぎる）
       const botLex = this.players[seat].isBot ? this.players[seat].botLex : undefined;
       const chk: WordCheck = botLex ? (w) => botLex.lookup(w) : this.check(seat);
-      const comp = completeWith(this.handGroups(seat), tile, hp.melds.length, chk);
+      const comp = completeWith(this.handGroups(seat), tile, hp.melds.length, chk, this.chiitoi);
       if (comp) {
         const furiten = this.isFuriten(seat, tile.ch);
         const y = this.yakuFor(this.claimFor(seat, this.lastDiscard!.seat, tile, comp));
@@ -697,7 +693,6 @@ export class Game {
     {
       const hp = this.hands[seat];
       if (r.call === "ron" && hp.called) return "ポン・カンをした局はロンできません";
-      if (r.call === "ron" && hp.noAgari) return "この局はアガリ放棄です";
       if (r.call === "pon" && !cs.canPon) return "ポンできません";
       if (r.call === "kan" && !cs.canKan) return "カンできません";
       cs.response = r;
@@ -766,12 +761,8 @@ export class Game {
       this.finalizeDiscard();
       return null;
     }
+    // 辞書にない語でも鳴ける（アガったときに、辞書にない語は投票で確かめる）
     const word = tileIds.map((id) => (id === d.tile.id ? d.tile.ch : hp.hand.find((t) => t.id === id)!.ch)).join("");
-    if (!this.lex(seat).lookup(word)) {
-      this.mistakenCall(seat, word);
-      this.finalizeDiscard();
-      return null;
-    }
     const opt = { id: 0, word, tileIds };
     if (cd.call === "pon") this.doPon(seat, opt);
     else this.doMinkan(seat, opt);
@@ -808,7 +799,7 @@ export class Game {
     const t = this.lastDiscard!.tile;
     const sh = this.sentenceShape(pr.seat);
     if (sh && sh.extra === null) pr.sentence = this.sentenceOf(pr.seat, [...sh.ids, t.id], t);
-    else pr.comp = completeWith(this.handGroups(pr.seat), t, hp.melds.length, this.loose(pr.seat));
+    else pr.comp = completeWith(this.handGroups(pr.seat), t, hp.melds.length, this.loose(pr.seat), this.chiitoi);
   }
 
   private placeRon(seat: number, group: number, pos: number): string | null {
@@ -830,8 +821,8 @@ export class Game {
     const ng = groups.map((x, i) =>
       i === group ? { word: [...chars.slice(0, pos), t.ch, ...chars.slice(pos)].join(""), ids: [...g.ids.slice(0, pos), t.id, ...g.ids.slice(pos)] } : x,
     );
-    const comp = checkComplete(ng, hp.melds.length, this.loose(seat));
-    if (!comp) return shapeError(ng, hp.melds.length, "になりません");
+    const comp = checkComplete(ng, hp.melds.length, this.loose(seat), this.chiitoi);
+    if (!comp) return shapeError(ng, hp.melds.length, this.chiitoi, "になりません");
     pr.comp = comp;
     if (this.pendingRon.every((p) => this.ronPlaced(p))) this.judgeRons();
     return null;
@@ -917,11 +908,6 @@ export class Game {
     const opt = this.turnActions?.ankan.find((o) => o.id === optionId);
     if (!opt) return "カンできません";
     const hp = this.hands[seat];
-    if (!this.lex(seat).lookup(opt.word)) {
-      this.mistakenCall(seat, opt.word);
-      this.turnActions = this.computeTurnActions(seat);
-      return null;
-    }
     const used = new Set(opt.tileIds);
     const tiles = opt.tileIds.map((id) => hp.hand.find((t) => t.id === id)!);
     hp.hand = hp.hand.filter((t) => !used.has(t.id));
@@ -940,11 +926,6 @@ export class Game {
     const opt = this.turnActions?.kakan.find((o) => o.id === optionId);
     if (!opt) return "カンできません";
     const hp = this.hands[seat];
-    if (!this.lex(seat).lookup(opt.word)) {
-      this.mistakenCall(seat, opt.word);
-      this.turnActions = this.computeTurnActions(seat);
-      return null;
-    }
     const meld = hp.melds.find((m) => m.type === "pon" && opt.tileIds.includes(m.tiles[0].id));
     if (!meld) return "カンできません";
     const meldIds = new Set(meld.tiles.map((t) => t.id));
@@ -1070,8 +1051,7 @@ export class Game {
         c.items = [];
         continue;
       }
-      if (this.hands[c.seat].noAgari) c.invalid = "誤った鳴きのためアガリ放棄";
-      else if (c.form !== "sakubun" && this.yakuFor(c, true).mainHan < 1 && !c.theme) c.invalid = "役がありません";
+      if (c.form !== "sakubun" && this.yakuFor(c, true).mainHan < 1 && !c.theme) c.invalid = "役がありません";
       if (c.invalid) c.items = [];
     }
     const live = claims.filter((c) => !c.invalid);
@@ -1480,7 +1460,7 @@ export class Game {
         this.turnActions = this.computeTurnActions(seat);
         // 役があるときだけ宣言する（役なしの宣言はチョンボになる）
         const comp = this.tsumoCompletion(seat);
-        if (comp && !hp.noAgari && this.yakuFor(this.claimFor(seat, null, this.drawnTile(seat), comp)).mainHan >= 1) {
+        if (comp && this.yakuFor(this.claimFor(seat, null, this.drawnTile(seat), comp)).mainHan >= 1) {
           this.act(p.id, { type: "tsumo" });
           return;
         }
@@ -1530,7 +1510,6 @@ export class Game {
         if (this.step !== "turn" || this.turn !== seat || this.afterCall) return "ツモできません";
         {
           const hp = this.hands[seat];
-          if (hp.noAgari) return "この局はアガリ放棄です";
           let groups = this.handGroups(seat);
           if (a.place) {
             // 離したツモ牌を選んだ場所に入れる（リーチ中は並べ替えできないので、サーバーで入れる）
@@ -1543,8 +1522,8 @@ export class Game {
             rest[a.place.group] = { word: [...chars.slice(0, pos), last.word, ...chars.slice(pos)].join(""), ids: [...g.ids.slice(0, pos), last.ids[0], ...g.ids.slice(pos)] };
             groups = rest;
           }
-          const comp = checkComplete(groups, hp.melds.length, this.loose(seat));
-          if (!comp) return shapeError(groups, hp.melds.length, "に並べてください");
+          const comp = checkComplete(groups, hp.melds.length, this.loose(seat), this.chiitoi);
+          if (!comp) return shapeError(groups, hp.melds.length, this.chiitoi, "に並べてください");
           this.clearTimer("turn");
           this.consumeBank(seat, this.turnStartedAt);
           this.declareWins([this.claimFor(seat, null, this.drawnTile(seat), comp)]);
@@ -1555,7 +1534,6 @@ export class Game {
       case "sakubun": {
         if (this.step !== "turn" || this.turn !== seat || this.afterCall) return "作文できません";
         const hp = this.hands[seat];
-        if (hp.noAgari) return "この局はアガリ放棄です";
         const sh = hp.hand.length === 14 ? this.sentenceShape(seat) : null;
         if (!sh) return "作文は鳴きなしの14牌を区切らずに並べて宣言します";
         let ids = sh.ids;
@@ -1676,7 +1654,7 @@ export class Game {
         const cs = this.calls.get(mySeat);
         if (cs && !cs.response) {
           const hp = this.hands[mySeat];
-          actions = { kind: "call", ron: !hp.called && !hp.noAgari, tile: this.lastDiscard!.tile, fromSeat: this.lastDiscard!.seat, canPon: cs.canPon, canKan: cs.canKan };
+          actions = { kind: "call", ron: !hp.called, tile: this.lastDiscard!.tile, fromSeat: this.lastDiscard!.seat, canPon: cs.canPon, canKan: cs.canKan };
           deadline = this.windowDeadline;
         }
       } else if (this.step === "claim") {
@@ -1755,7 +1733,8 @@ export class Game {
 }
 
 /** アガリ形にならないときの理由。七対子で同じ語が2組あるときはそれを伝える */
-function shapeError(groups: { word: string }[], meldCount: number, tail: string): string {
+function shapeError(groups: { word: string }[], meldCount: number, chiitoi: boolean, tail: string): string {
+  if (!chiitoi) return `アガリの形（2文字×1＋3文字×4）${tail}`;
   if (meldCount === 0 && groups.length === 7 && groups.every((x) => [...x.word].length === 2)) {
     const seen = new Set<string>();
     for (const x of groups) {

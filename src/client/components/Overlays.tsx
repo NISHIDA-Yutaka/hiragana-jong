@@ -45,12 +45,13 @@ function WinHand({ w }: { w: WinView }) {
 
 function WinBlock({ w, idx }: { w: WinView; idx: number }) {
   const [shown, setShown] = useState(0);
-  useEffect(() => {
-    setShown(0);
-    const t = setInterval(() => setShown((x) => x + 1), 260);
-    return () => clearInterval(t);
-  }, [w]);
   const total = w.yaku.length;
+  // 役を1つずつ出す。状態が届くたびに w は作り直されるので、表示し始めたときだけ数える
+  useEffect(() => {
+    const t = setInterval(() => setShown((x) => (x > total ? x : x + 1)), 260);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   return (
     <div className="win-block" style={{ animationDelay: `${idx * 0.2}s` }}>
       <div className="win-who">
@@ -98,10 +99,11 @@ function ScoreDeltas({ r, g }: { r: HandResultView; g: GameView }) {
 export function ResultModal({ g }: { g: GameView }) {
   const r = g.result!;
   const [ready, setReady] = useState(false);
+  // 結果ごとに作り直される（Table で key を付けている）ので、効果音は開いたときに1回だけ
   useEffect(() => {
-    setReady(false);
     if (r.kind === "agari") fanfare(r.wins.some((w) => w.yakuman || w.han >= 6));
-  }, [r]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const ok = () => {
     setReady(true);
     send("game:action", { type: "ready" });
