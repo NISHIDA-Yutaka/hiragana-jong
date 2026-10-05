@@ -60,11 +60,10 @@ export function Table() {
   const [callouts, setCallouts] = useState<Callout[]>([]);
   const [riichiMode, setRiichiMode] = useState<null | "riichi" | "open">(null);
   const [chooser, setChooser] = useState<null | { title: string; options: CallOption[]; onPick: (o: CallOption) => void }>(null);
-  const [auto, setAuto] = useState(() => lsGet("auto", { win: false, noCall: false, tsumogiri: false }));
+  const [auto, setAuto] = useState(() => lsGet("auto", { tsumogiri: false }));
   const [oneClick, setOneClick] = useState(() => lsGet("oneClick", false));
   const [tsumoOpen, setTsumoOpen] = useState(false);
   const [sakuPlace, setSakuPlace] = useState(false);
-  const declare = g.judgeMode === "declare";
   const [, force] = useState(0);
   const lastSeq = useRef<number>(Math.max(0, ...g.events.map((e) => e.seq)));
   const unreadChat = useUnreadChat(panel === "chat");
@@ -129,19 +128,13 @@ export function Table() {
     setSakuPlace(false);
   }, [actions?.kind, g.turn, g.phase]);
 
-  // 自動和了・鳴きなし・ツモ切り
+  // 自動ツモ切り
   useEffect(() => {
-    if (spectator) return;
-    if (callA && !declare) {
-      if (callA.ron && auto.win) void act({ type: "call", call: "ron" });
-      else if (!callA.ron && auto.noCall) void act({ type: "call", call: "pass" });
-    } else if (turnA) {
-      if (turnA.canTsumo && auto.win && !declare) void act({ type: "tsumo" });
-      else if (auto.tsumogiri && !turnA.afterCall && g.drawnId !== null && (declare || (!turnA.canTsumo && !turnA.locked))) {
-        const id = g.drawnId;
-        const t = setTimeout(() => act({ type: "discard", tileId: id }), 350);
-        return () => clearTimeout(t);
-      }
+    if (spectator || !turnA) return;
+    if (auto.tsumogiri && !turnA.afterCall && g.drawnId !== null) {
+      const id = g.drawnId;
+      const t = setTimeout(() => act({ type: "discard", tileId: id }), 350);
+      return () => clearTimeout(t);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [actions, auto]);
@@ -310,25 +303,13 @@ export function Table() {
             </div>
 
             <div className="auto-toggles">
-              {!declare && (
-                <>
-                  <label className={auto.win ? "on" : ""}>
-                    <input type="checkbox" checked={auto.win} onChange={(e) => setAutoK("win", e.target.checked)} />
-                    自動和了
-                  </label>
-                  <label className={auto.noCall ? "on" : ""}>
-                    <input type="checkbox" checked={auto.noCall} onChange={(e) => setAutoK("noCall", e.target.checked)} />
-                    鳴きなし
-                  </label>
-                </>
-              )}
               <label className={auto.tsumogiri ? "on" : ""}>
                 <input type="checkbox" checked={auto.tsumogiri} onChange={(e) => setAutoK("tsumogiri", e.target.checked)} />
                 ツモ切り
               </label>
             </div>
 
-            {remain !== null && (isMyTurn || (callA && !callA.declare)) && (
+            {remain !== null && isMyTurn && (
               <div className={`timer ${remain <= 5 ? "urgent" : ""}`}>
                 {remain > g.bank ? (
                   <>
@@ -338,15 +319,6 @@ export function Table() {
                 ) : (
                   <b>{Math.ceil(remain)}</b>
                 )}
-              </div>
-            )}
-
-            {g.waits.length > 0 && (
-              <div className="waits">
-                待ち：
-                {g.waits.map((c) => (
-                  <Tile key={c} ch={c} size="xs" />
-                ))}
               </div>
             )}
 
@@ -373,12 +345,12 @@ export function Table() {
                 </>
               ) : riichiMode ? (
                 <>
-                  <span className="ab-title">{declare ? "切る牌を選んでリーチ（テンパイかは自己申告）" : "光っている牌を切ってリーチ"}</span>
+                  <span className="ab-title">切る牌を選んでリーチ（テンパイかは自己申告）</span>
                   <button className="abtn abtn-skip" onClick={() => setRiichiMode(null)}>
                     キャンセル
                   </button>
                 </>
-              ) : callA?.declare ? (
+              ) : callA ? (
                 <>
                   <span className="ab-title">
                     <Tile ch={callA.tile.ch} size="xs" /> {g.seats[callA.fromSeat].name}
@@ -405,38 +377,13 @@ export function Table() {
                     スキップ
                   </button>
                 </>
-              ) : callA ? (
-                <>
-                  <span className="ab-title">
-                    <Tile ch={callA.tile.ch} size="xs" /> {g.seats[callA.fromSeat].name}
-                  </span>
-                  {callA.ron && (
-                    <button className="abtn abtn-ron" onClick={() => act({ type: "call", call: "ron" })}>
-                      ロン
-                    </button>
-                  )}
-                  {callA.kan.length > 0 && (
-                    <button className="abtn abtn-kan" onClick={() => pick("カンする語", callA.kan, (o) => act({ type: "call", call: "kan", optionId: o.id }))}>
-                      カン{callA.kan.length === 1 ? `（${callA.kan[0].word}）` : ""}
-                    </button>
-                  )}
-                  {callA.pon.length > 0 && (
-                    <button className="abtn abtn-pon" onClick={() => pick("ポンする語", callA.pon, (o) => act({ type: "call", call: "pon", optionId: o.id }))}>
-                      ポン{callA.pon.length === 1 ? `（${callA.pon[0].word}）` : ""}
-                    </button>
-                  )}
-                  <button className="abtn abtn-skip" onClick={() => act({ type: "call", call: "pass" })}>
-                    スキップ
-                  </button>
-                </>
               ) : turnA && g.phase === "play" ? (
                 <>
                   {turnA.canTsumo && (
-                    <button className={`abtn abtn-ron ${declare ? "abtn-quiet" : ""}`} onClick={() => {
+                    <button className="abtn abtn-ron abtn-quiet" onClick={() => {
                         // 作文待ちのリーチでツモ牌が離れているときは作文の宣言にする
                         if (turnA.canSakubun && toGroups(g.arrangement, g.myHand).length === 2) setSakuPlace(true);
-                        else if (declare) setTsumoOpen(true);
-                        else void act({ type: "tsumo" });
+                        else setTsumoOpen(true);
                       }}>
                       ツモ
                     </button>

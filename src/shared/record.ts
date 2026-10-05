@@ -9,7 +9,6 @@ export interface AgariRecord {
   room?: string;
   dict: DictConfig;
   playerCount: number;
-  judgeMode: "declare" | "assist";
   name: string;
   isBot: boolean;
   botLevel?: string;

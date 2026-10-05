@@ -221,7 +221,6 @@ export class Room {
     if (s.timer && ["fast", "normal", "slow", "none"].includes(s.timer)) next.timer = s.timer;
     if (typeof s.calls === "boolean") next.calls = s.calls;
     if (s.rejectPenalty && ["cancel", "chombo"].includes(s.rejectPenalty)) next.rejectPenalty = s.rejectPenalty;
-    if (s.judgeMode && ["declare", "assist"].includes(s.judgeMode)) next.judgeMode = s.judgeMode;
     if (s.callSeconds && [5, 8, 10, 12].includes(s.callSeconds)) next.callSeconds = s.callSeconds;
     if (s.riipaiSeconds !== undefined && [0, 60, 180, 300].includes(s.riipaiSeconds)) next.riipaiSeconds = s.riipaiSeconds;
     this.settings = next;

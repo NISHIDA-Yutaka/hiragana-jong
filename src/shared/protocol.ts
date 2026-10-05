@@ -21,9 +21,7 @@ export interface RoomSettings {
   calls: boolean;
   /** 投票で否決されたとき：cancel=取り消しのみ / chombo=チョンボ（満貫払い） */
   rejectPenalty: "cancel" | "chombo";
-  /** declare=自己申告（アナログ準拠。いつでも宣言でき、他の人が確認） / assist=アガれる形のときだけボタンが出る */
-  judgeMode: "declare" | "assist";
-  /** 自己申告で、打牌のあとロン・ポン・カンを受け付ける秒数 */
+  /** 打牌のあとロン・ポン・カンを受け付ける秒数 */
   callSeconds: 5 | 8 | 10 | 12;
   /** 局の始めに全員で理牌する時間（秒）。0=なし */
   riipaiSeconds: 0 | 60 | 180 | 300;
@@ -38,7 +36,6 @@ export const DEFAULT_SETTINGS: RoomSettings = {
   timer: "normal",
   calls: true,
   rejectPenalty: "chombo",
-  judgeMode: "declare",
   callSeconds: 5,
   riipaiSeconds: 180,
 };
@@ -134,16 +131,13 @@ export type ActionsView =
       afterCall: boolean;
     }
   | {
+      /** ロン・ポン・カンは押したあとで、自分で牌と語を選ぶ */
       kind: "call";
       ron: boolean;
-      pon: CallOption[];
-      kan: CallOption[];
       tile: Tile;
       fromSeat: number;
-      /** 自己申告：語の候補は出さず、押したあとで自分で選ぶ */
-      declare?: boolean;
-      canPon?: boolean;
-      canKan?: boolean;
+      canPon: boolean;
+      canKan: boolean;
     }
   | {
       /** 自己申告のロン：ロン牌をどの語のどこに入れるか選ぶ */
@@ -243,7 +237,6 @@ export interface GameView {
   phase: "riipai" | "play" | "calls" | "claim" | "vote" | "result" | "final";
   /** 理牌タイム（局の始め） */
   riipai: { deadline: number | null; waiting: string[]; done: boolean } | null;
-  judgeMode: "declare" | "assist";
   /** 宣言中などのお知らせ */
   notice: string | null;
   lengthLabel: string;
@@ -259,8 +252,6 @@ export interface GameView {
   final: FinalView | null;
   lastDiscard: { seat: number; tileId: number } | null;
   events: GameEvent[];
-  /** リーチ中の自分の待ち */
-  waits: string[];
   readyWaiting: string[];
   myTheme: { name: string; pure: boolean } | null;
 }
@@ -273,7 +264,7 @@ export type GameAction =
   | { type: "kakan"; optionId: number }
   /** pos：リーチ中に離したツモ牌を文章の何文字目に入れるか */
   | { type: "sakubun"; pos?: number }
-  | { type: "call"; call: "ron" | "pon" | "kan" | "pass"; optionId?: number }
+  | { type: "call"; call: "ron" | "pon" | "kan" | "pass" }
   | { type: "ronPlace"; group: number; pos: number }
   | { type: "ronCancel" }
   | { type: "callDetail"; tileIds?: number[]; cancel?: boolean }
