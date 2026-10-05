@@ -674,6 +674,47 @@ fieldset:disabled .seg button:not(.on) {
   font-size: 14px;
   cursor: pointer;
 }
+/* 牌の一覧 */
+.tc-sum {
+  font-weight: 700;
+  color: var(--gold);
+  margin-bottom: 6px;
+}
+.tc-sum small {
+  display: block;
+  font-weight: 400;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+.tc-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.tc-row {
+  display: flex;
+  gap: 6px;
+}
+.tc-cell {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  width: 58px;
+  padding: 3px 4px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.04);
+}
+.tc-num b {
+  font-size: 15px;
+  color: #f3e6c2;
+}
+.tc-num small {
+  font-size: 10.5px;
+  color: var(--muted);
+}
+.tc-gone {
+  opacity: 0.35;
+}
 /* 役一覧 */
 .yk-tools {
   display: flex;
@@ -1219,7 +1260,7 @@ fieldset:disabled .seg button:not(.on) {
   gap: 6px;
   flex-wrap: wrap;
   justify-content: flex-end;
-  max-width: 370px;
+  max-width: 480px;
   align-items: center;
 }
 .tb-room {

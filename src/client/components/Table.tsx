@@ -9,6 +9,7 @@ import { FinalModal, ResultModal, VoteModal } from "./Overlays";
 import { ChatPanel, MyWordsPanel, RoomWordsPanel, ThemePanel, YakuPanel } from "./Panels";
 import { CenterBox, Meld, NamePlate, Pos, posFor, SeatZone } from "./Seats";
 import { Tile } from "./Tile";
+import { seenCounts, TileCountList } from "./TileCount";
 
 const W = 1600;
 const H = 900;
@@ -56,7 +57,7 @@ export function Table() {
   const scale = useStageScale();
   const me = g.mySeat ?? 0;
   const spectator = g.mySeat === null;
-  const [panel, setPanel] = useState<null | "chat" | "words" | "theme" | "room" | "yaku" | "settings">(null);
+  const [panel, setPanel] = useState<null | "chat" | "words" | "theme" | "room" | "tiles" | "yaku" | "settings">(null);
   const [callouts, setCallouts] = useState<Callout[]>([]);
   const [riichiMode, setRiichiMode] = useState<null | "riichi" | "open">(null);
   const [chooser, setChooser] = useState<null | { title: string; options: CallOption[]; onPick: (o: CallOption) => void }>(null);
@@ -207,6 +208,9 @@ export function Table() {
           <button className={`tb-btn ${panel === "room" ? "on" : ""}`} onClick={() => setPanel(panel === "room" ? null : "room")}>
             ルーム辞書
           </button>
+          <button className={`tb-btn ${panel === "tiles" ? "on" : ""}`} onClick={() => setPanel(panel === "tiles" ? null : "tiles")}>
+            牌
+          </button>
           <button className={`tb-btn ${panel === "yaku" ? "on" : ""}`} onClick={() => setPanel(panel === "yaku" ? null : "yaku")}>
             役
           </button>
@@ -218,7 +222,7 @@ export function Table() {
         {panel && (
           <div className="side-panel">
             <div className="sp-head">
-              {{ chat: "チャット", words: "マイ単語", theme: "同種の宣言", room: "ルーム辞書", yaku: "役一覧", settings: "設定" }[panel]}
+              {{ chat: "チャット", words: "マイ単語", theme: "同種の宣言", room: "ルーム辞書", tiles: "牌の一覧", yaku: "役一覧", settings: "設定" }[panel]}
               <button className="btn btn-xs btn-ghost" onClick={() => setPanel(null)}>
                 ✕
               </button>
@@ -228,6 +232,11 @@ export function Table() {
               {panel === "words" && <MyWordsPanel />}
               {panel === "theme" && <ThemePanel />}
               {panel === "room" && <RoomWordsPanel />}
+              {panel === "tiles" && (
+                <div className="panel-sec">
+                  <TileCountList extraTiles={room.settings.extraTiles} seen={seenCounts(g)} />
+                </div>
+              )}
               {panel === "yaku" && <YakuPanel />}
               {panel === "settings" && (
                 <div className="panel-sec settings-list">

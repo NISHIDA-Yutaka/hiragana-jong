@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { BotLevel, RoomSettings } from "../../shared/protocol";
 import { emit, leaveRoom, send, toast, useStore } from "../net";
 import { ChatPanel, MyWordsPanel, RoomWordsPanel, YakuPanel } from "./Panels";
+import { TileCountList } from "./TileCount";
 
 const LEVELS: [BotLevel, string][] = [
   ["weak", "弱い"],
@@ -12,7 +13,7 @@ const LEVELS: [BotLevel, string][] = [
 export function Lobby() {
   const room = useStore((s) => s.room)!;
   const [level, setLevel] = useState<BotLevel>("normal");
-  const [tab, setTab] = useState<"chat" | "words" | "room" | "yaku">("chat");
+  const [tab, setTab] = useState<"chat" | "words" | "room" | "tiles" | "yaku">("chat");
   const s = room.settings;
   const host = room.isHost;
   const set = (p: Partial<RoomSettings>) => send("room:settings", p);
@@ -215,6 +216,7 @@ export function Lobby() {
                 ["chat", "チャット"],
                 ["words", "マイ単語"],
                 ["room", "ルーム辞書"],
+                ["tiles", "牌"],
                 ["yaku", "役一覧"],
               ] as const
             ).map(([k, l]) => (
@@ -227,6 +229,11 @@ export function Lobby() {
             {tab === "chat" && <ChatPanel />}
             {tab === "words" && <MyWordsPanel />}
             {tab === "room" && <RoomWordsPanel lobby />}
+            {tab === "tiles" && (
+              <div className="panel-sec">
+                <TileCountList extraTiles={s.extraTiles} seen={null} />
+              </div>
+            )}
             {tab === "yaku" && <YakuPanel />}
           </div>
         </section>
