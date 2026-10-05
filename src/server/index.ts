@@ -258,6 +258,17 @@ setInterval(() => {
 
 app.get("/healthz", (_req, res) => res.send("ok"));
 
+// リリースしてよいかの確認用：進行中の対局とつながっている人の数だけを返す（名前などは出さない）
+app.get("/api/status", (_req, res) => {
+  let activeGames = 0;
+  let players = 0;
+  for (const room of rooms.values()) {
+    players += room.connectedHumans;
+    if (room.game && !room.game.isOver && room.connectedHumans > 0) activeGames++;
+  }
+  res.json({ activeGames, players, rooms: rooms.size, safeToRelease: activeGames === 0 });
+});
+
 // アガリの記録のダウンロード。LOG_KEY を設定したときは ?key= が必要、未設定ならこのPCからだけ
 app.get("/api/agari-log", (req, res) => {
   const key = process.env.LOG_KEY;
