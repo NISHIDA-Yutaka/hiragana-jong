@@ -2,6 +2,7 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { THEMES } from "../../shared/yaku";
 import { emit, getMyWords, send, setMyWords, toast, useStore } from "../net";
+import { Tile } from "./Tile";
 
 export function ChatPanel({ compact }: { compact?: boolean }) {
   const chat = useStore((s) => s.room?.chat ?? []);
@@ -164,37 +165,103 @@ export function ThemePanel() {
   );
 }
 
-const YAKU_TABLE: [string, string, string][] = [
-  ["門前清自摸和", "1", "鳴かずにツモ"],
-  ["立直", "1（一巡目2）", "門前でテンパイを宣言"],
-  ["一発", "1", "リーチ後1巡以内にアガる"],
-  ["清文", "1（門前2）", "特殊文字（濁音・ー等）を含まない"],
-  ["同頭", "1（門前2）", "語頭が同じ語が2つ"],
-  ["同尾", "1（門前2）", "語尾が同じ語が2つ"],
-  ["三槓子", "1（暗カン3）", "カンが3つ"],
-  ["回文", "1／語", "とまと など回文の語"],
-  ["二連", "2（門前3）", "頭以外の2語がしりとり"],
-  ["五音", "2（門前4）", "5語の頭文字の母音があいうえお"],
-  ["特文", "2（門前3）", "頭以外の全語に特殊文字"],
-  ["四槓子", "2（暗カン4）", "カンが4つ"],
-  ["オープンリーチ", "2（一巡目3）", "手牌を公開してリーチ"],
-  ["七対子", "2", "2文字の語×7（異なる語）"],
-  ["同頭同尾", "3（門前4）", "同頭と同尾を1組ずつ"],
-  ["同種", "3（門前4）", "頭以外が同じテーマ（宣言・投票）"],
-  ["同言", "3（門前4）", "まったく同じ語が2つ"],
-  ["純特文", "3（門前4）", "全ての語に特殊文字"],
-  ["重回文", "3＋α", "語をつなげて4文字以上の回文（＋文字数−4）"],
-  ["天和／地和", "4", "配牌でアガる／親の第一打でロン"],
-  ["三連", "4（門前5）", "頭以外の3語がしりとり"],
-  ["純同種", "4（門前5）", "全ての語が同じテーマ"],
-  ["作文", "4", "14牌で1つの文章（鳴きなし・投票）"],
-  ["四連", "6（門前8）", "頭以外の4語がしりとり"],
-  ["純行", "6（門前8）", "5語の頭文字が同じ行（あいうえお等）"],
-  ["五連", "8（門前で役満）", "頭から5語すべてしりとり"],
-  ["重言", "8（門前で役満）", "同じ語のペアが2組"],
-  ["カンドラ", "副次", "カン1つにつき（文字数−3）翻"],
-  ["特殊文字ドラ", "副次", "特殊文字4枚以上で（枚数−3）翻"],
+interface YakuInfo {
+  name: string;
+  han: string;
+  /** 門前・一巡目などのときの翻数 */
+  sub?: string;
+  desc: string;
+  /** 見本。語は「・」、しりとりは「→」で区切り、[ ] で囲んだ文字を目立たせる */
+  ex?: string;
+}
+
+const YAKU_GROUPS: { title: string; items: YakuInfo[] }[] = [
+  {
+    title: "1翻",
+    items: [
+      { name: "門前清自摸和", han: "1翻", desc: "鳴かずにツモでアガる" },
+      { name: "立直", han: "1翻", sub: "一巡目 2翻", desc: "門前でテンパイを宣言。以後は手牌を変えられない" },
+      { name: "一発", han: "1翻", desc: "リーチ後1巡以内にアガる" },
+      { name: "清文", han: "1翻", sub: "門前 2翻", desc: "特殊文字（濁音・ー など）を1枚も使わない", ex: "あい・しんり・さかな・おやつ・はさみ" },
+      { name: "同頭", han: "1翻", sub: "門前 2翻", desc: "語頭が同じ語が2つ", ex: "[さ]くら・[さ]かな" },
+      { name: "同尾", han: "1翻", sub: "門前 2翻", desc: "語尾が同じ語が2つ", ex: "たぬ[き]・ゆう[き]" },
+      { name: "回文", han: "1翻", sub: "1語につき", desc: "前から読んでも後ろから読んでも同じ語", ex: "[とまと]" },
+      { name: "三槓子", han: "1翻", sub: "暗カン 3翻", desc: "カン（4文字以上の語）が3つ", ex: "さくせん・とういつ・ほうこく" },
+    ],
+  },
+  {
+    title: "2翻",
+    items: [
+      { name: "二連", han: "2翻", sub: "門前 3翻", desc: "頭以外の2語がしりとり", ex: "から[す]→[す]いか" },
+      { name: "五音", han: "2翻", sub: "門前 4翻", desc: "5語の頭文字の母音が あ・い・う・え・お", ex: "[あ]い・[き]んか・[す]いか・[て]んき・[お]かゆ" },
+      { name: "特文", han: "2翻", sub: "門前 3翻", desc: "頭以外の4語すべてに特殊文字", ex: "ねこ・ぎんか・きっぷ・げーむ・だいす" },
+      { name: "七対子", han: "2翻", desc: "2文字の語×7（同じ語は不可）", ex: "ねこ・いぬ・そら・やま・かさ・はな・いす" },
+      { name: "オープンリーチ", han: "2翻", sub: "一巡目 3翻", desc: "手牌をすべて見せてリーチ" },
+      { name: "四槓子", han: "2翻", sub: "暗カン 4翻", desc: "カンが4つ" },
+    ],
+  },
+  {
+    title: "3翻",
+    items: [
+      { name: "同頭同尾", han: "3翻", sub: "門前 4翻", desc: "同頭と同尾を別々の2組で", ex: "[お]やつ・[お]さけ・たぬ[き]・ゆう[き]" },
+      { name: "同言", han: "3翻", sub: "門前 4翻", desc: "まったく同じ語が2つ", ex: "[さくら]・[さくら]" },
+      { name: "同種", han: "3翻", sub: "門前 4翻", desc: "頭以外が同じテーマ（「同種」で宣言し、投票で判定）", ex: "うなぎ・すずめ・めばる・たがめ" },
+      { name: "重回文", han: "3翻〜", sub: "＋（文字数−4）", desc: "隣り合う語をつなげて4文字以上の回文", ex: "[たしか]・[かした]" },
+      { name: "純特文", han: "3翻", sub: "門前 4翻", desc: "頭も含めすべての語に特殊文字", ex: "ざい・ぎんか・だいす・きっぷ・げーむ" },
+    ],
+  },
+  {
+    title: "4翻",
+    items: [
+      { name: "三連", han: "4翻", sub: "門前 5翻", desc: "頭以外の3語がしりとり", ex: "から[す]→[す]い[か]→[か]もめ" },
+      { name: "純同種", han: "4翻", sub: "門前 5翻", desc: "頭も含めすべての語が同じテーマ", ex: "いか・うさぎ・すずめ・めばる・かもめ" },
+      { name: "作文", han: "4翻", desc: "14牌で1つの文章（鳴きなし・投票で判定）", ex: "きょうはとてもよいてんきだね" },
+      { name: "天和・地和", han: "4翻", desc: "親が配牌でアガる・子が親の最初の捨て牌でロン" },
+    ],
+  },
+  {
+    title: "6翻〜役満",
+    items: [
+      { name: "四連", han: "6翻", sub: "門前 8翻", desc: "頭以外の4語がしりとり", ex: "から[す]→[す]い[か]→[か]も[め]→[め]だか" },
+      { name: "純行", han: "6翻", sub: "門前 8翻", desc: "5語の頭文字が同じ行で あいうえお（か行などでも可）", ex: "[あ]い・[い]なり・[う]きわ・[え]ほん・[お]かめ" },
+      { name: "五連", han: "8翻", sub: "門前で役満", desc: "頭から始めて5語すべてしりとり", ex: "い[た]→[た]ん[す]→[す]い[か]→[か]ん[さ]→[さ]んぽ" },
+      { name: "重言", han: "8翻", sub: "門前で役満", desc: "同じ語のペアが2組", ex: "[さくら]・[さくら]・かすみ・かすみ" },
+    ],
+  },
+  {
+    title: "副次役（これだけではアガれない）",
+    items: [
+      { name: "カンドラ", han: "副次", desc: "カン1つにつき（文字数−3）翻", ex: "さくせん" },
+      { name: "特殊文字ドラ", han: "副次", desc: "特殊文字が4枚以上で（枚数−3）翻" },
+    ],
+  },
 ];
+
+/** 見本の文字列を、語ごとの牌の並びにする */
+function YakuExample({ ex }: { ex: string }) {
+  return (
+    <div className="yk-ex">
+      {ex.split(/(・|→)/).map((part, i) => {
+        if (part === "・" || part === "") return null;
+        if (part === "→") return <span key={i} className="yk-arrow">→</span>;
+        const tiles: { ch: string; hl: boolean }[] = [];
+        let hl = false;
+        for (const ch of part) {
+          if (ch === "[") hl = true;
+          else if (ch === "]") hl = false;
+          else tiles.push({ ch, hl });
+        }
+        return (
+          <span key={i} className="yk-word">
+            {tiles.map((t, j) => (
+              <Tile key={j} ch={t.ch} size="xs" className={t.hl ? "yk-hl" : ""} />
+            ))}
+          </span>
+        );
+      })}
+    </div>
+  );
+}
 
 /** 基本の牌（特殊文字が「ー」1枚だけ）では成り立たないので数えない役 */
 const SPECIAL_YAKU = new Set(["清文", "特文", "純特文", "特殊文字ドラ"]);
@@ -202,20 +269,29 @@ const SPECIAL_YAKU = new Set(["清文", "特文", "純特文", "特殊文字ド�
 export function YakuPanel() {
   const extraTiles = useStore((s) => s.room?.settings.extraTiles ?? true);
   return (
-    <div className="panel-sec">
-      <table className="yaku-table">
-        <tbody>
-          {YAKU_TABLE.filter(([n]) => extraTiles || !SPECIAL_YAKU.has(n)).map(([n, h, d]) => (
-            <tr key={n}>
-              <td className="yn">{n}</td>
-              <td className="yh">{h}</td>
-              <td className="yd">{d}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+    <div className="panel-sec yk">
       {!extraTiles && <p className="hint">基本の牌（濁音などの追加なし）では、清文・特文・純特文・特殊文字ドラはありません。</p>}
-      <p className="hint">13翻以上は数え役満。点数は1翻1本〜役満32本（親は1.5倍）。1本＝1,000点。</p>
+      {YAKU_GROUPS.map((g) => {
+        const items = g.items.filter((y) => extraTiles || !SPECIAL_YAKU.has(y.name));
+        if (!items.length) return null;
+        return (
+          <section key={g.title} className="yk-group">
+            <h4 className="yk-title">{g.title}</h4>
+            {items.map((y) => (
+              <div key={y.name} className="yk-item">
+                <div className="yk-head">
+                  <span className="yk-name">{y.name}</span>
+                  <span className="yk-han">{y.han}</span>
+                  {y.sub && <span className="yk-sub">{y.sub}</span>}
+                </div>
+                <div className="yk-desc">{y.desc}</div>
+                {y.ex && <YakuExample ex={y.ex} />}
+              </div>
+            ))}
+          </section>
+        );
+      })}
+      <p className="hint">「門前」は鳴いていない（暗カンは可）とき。13翻以上は数え役満。点数は1翻1本〜役満32本（親は1.5倍）、1本＝1,000点。</p>
     </div>
   );
 }

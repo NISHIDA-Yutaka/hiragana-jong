@@ -1,5 +1,5 @@
 import { FormEvent, useState } from "react";
-import { createRoom, joinRoom, lsGet, toast, useStore } from "../net";
+import { createRoom, joinRoom, lsGet, lsSet, toast, useStore } from "../net";
 import { Tile } from "./Tile";
 
 export function Home() {
@@ -35,7 +35,17 @@ export function Home() {
 
         <label className="field">
           <span>あなたの名前</span>
-          <input value={name} maxLength={12} placeholder="例：たろう" onChange={(e) => setName(e.target.value)} autoFocus />
+          <input
+            value={name}
+            maxLength={12}
+            placeholder="例：たろう"
+            onChange={(e) => {
+              setName(e.target.value);
+              // 部屋に入る前でも、次に開いたときのために覚えておく（このブラウザだけ）
+              lsSet("name", e.target.value.trim());
+            }}
+            autoFocus
+          />
         </label>
 
         {urlCode ? (
@@ -75,9 +85,8 @@ export function Home() {
             <li>
               <b>言葉は自分で見つけます。</b>牌をドラッグして並べ、牌と牌のすき間をクリックすると区切れます。下の入力欄に語を打つと、その牌が集まります。
             </li>
-            <li>あと1枚でそろう形に並べておくと、その牌が出たときに「ロン」「ツモ」のボタンが出ます。</li>
+            <li>麻雀みたいにロンやツモを自動判別してくれないので、自己判断と自己申告になるよ。</li>
             <li>2枚の組＋捨て牌で3文字の語ができるときはポン、3枚以上の組なら4文字以上の語でカンできます。</li>
-            <li>辞書にない語は「マイ単語」に登録しておけば使えます（アガリのときに他の人が投票で判定）。</li>
           </ul>
         </details>
       </div>
