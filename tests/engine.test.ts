@@ -647,3 +647,53 @@ describe("観戦", () => {
     expect(game.viewFor("spectator").myHand).toEqual([]);
   });
 });
+
+describe("重回文・同種を対局の中で確かめる", () => {
+  // B の手「あい・たしか・かした・さくら・くる」は「ま」待ち（くるま）
+  const wall = () => rigWall("まそやまはなほへれろわそら", "あいたしかかしたさくらくる", "とほへ");
+  /** 1巡回してから A が「ま」を捨て、B がロンして「くる」に入れる */
+  function ronMa(game: Game) {
+    const pass = (id: string) => game.viewFor(id).actions?.kind === "call" && game.act(id, { type: "call", call: "pass" });
+    game.act("a", { type: "discard", tileId: game.viewFor("a").myHand.find((t) => t.ch === "そ")!.id });
+    pass("b");
+    game.act("b", { type: "discard", tileId: game.viewFor("b").drawnId! });
+    pass("a");
+    game.act("a", { type: "discard", tileId: game.viewFor("a").myHand.find((t) => t.ch === "ま")!.id });
+    expect(game.act("b", { type: "call", call: "ron" })).toBeNull();
+    expect(game.act("b", { type: "ronPlace", group: 4, pos: 2 })).toBeNull();
+  }
+  const yakuOf = (game: Game) => Object.fromEntries(game.viewFor("a").result!.wins[0].yaku.map((y) => [y.name, y.han]));
+
+  it("重回文（たしか・かした）でロンアガリ：5翻", () => {
+    const { game } = makeGame(wall());
+    arrangeAs(game, "b", ["あい", "たしか", "かした", "さくら", "くる"]);
+    ronMa(game);
+    if (game.viewFor("a").phase === "vote") game.act("a", { type: "vote", votes: {} });
+    expect(game.viewFor("a").result?.kind).toBe("agari");
+    expect(yakuOf(game)["重回文"]).toBe(5);
+  });
+
+  it("純同種を宣言して認められると、門前で5翻が付く", () => {
+    const { game } = makeGame(wall(), { themeB: { name: "ことば", pure: true } });
+    arrangeAs(game, "b", ["あい", "たしか", "かした", "さくら", "くる"]);
+    ronMa(game);
+    const item = game.viewFor("a").vote!.items.find((i) => i.kind === "theme")!;
+    expect(item.text).toContain("純同種");
+    game.act("a", { type: "vote", votes: {} });
+    const y = yakuOf(game);
+    expect(y["純同種"]).toBe(5);
+    expect(y["重回文"]).toBe(5);
+  });
+
+  it("同種が否決されても、ほかに役があれば同種なしでアガリ", () => {
+    const { game } = makeGame(wall(), { themeB: { name: "生き物", pure: false } });
+    arrangeAs(game, "b", ["あい", "たしか", "かした", "さくら", "くる"]);
+    ronMa(game);
+    const item = game.viewFor("a").vote!.items.find((i) => i.kind === "theme")!;
+    game.act("a", { type: "vote", votes: { [item.id]: false } });
+    expect(game.viewFor("a").result?.kind).toBe("agari");
+    const y = yakuOf(game);
+    expect(y["同種"]).toBeUndefined();
+    expect(y["重回文"]).toBe(5);
+  });
+});
