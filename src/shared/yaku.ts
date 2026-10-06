@@ -235,7 +235,8 @@ export function computeYaku(inp: YakuInput): YakuResult {
 
   // --- 副次役 ---
   let kanDora = 0;
-  for (const x of g) if (x.kan) kanDora += [...x.word].length - 3;
+  // ルールブックはカン1つにつき（文字数−3）翻。長い語のカン1つで跳満に届いてしまうため、カン1つにつき1翻までにしている
+  for (const x of g) if (x.kan) kanDora += Math.min(1, [...x.word].length - 3);
   if (kanDora > 0) add("カンドラ", kanDora, { sub: true });
   const sp = inp.tiles.filter(isSpecial).length;
   if (specialYaku && sp >= 4) add("特殊文字ドラ", sp - 3, { sub: true });

@@ -45,6 +45,12 @@ describe("役の計算", () => {
     expect(names(r)["重回文"]).toBe(5);
   });
 
+  it("カンドラはカン1つにつき1翻まで（7文字のカンでも1翻）", () => {
+    const kan = (w: string) => ({ ...g(w), kan: true });
+    const r = computeYaku(base([g("あい"), kan("さくらんぼ"), kan("ひまわり"), kan("かきくけこさし"), g("たぬき")]));
+    expect(names(r)["カンドラ"]).toBe(3);
+  });
+
   it("回文：とまと", () => {
     const r = computeYaku(base([g("あい"), g("とまと"), g("さくら"), g("くるま"), g("たぬき")]));
     expect(names(r)["回文"]).toBe(1);

@@ -67,7 +67,7 @@ const YAKU_GROUPS: { title: string; items: YakuInfo[] }[] = [
   {
     title: "副次役（これだけではアガれない）",
     items: [
-      { name: "カンドラ", han: "副次", desc: "カン1つにつき（文字数−3）翻", ex: "さくせん" },
+      { name: "カンドラ", han: "副次", desc: "カン1つにつき1翻（長い語でも1翻）", ex: "さくせん" },
       { name: "特殊文字ドラ", han: "副次", desc: "特殊文字が4枚以上で（枚数−3）翻" },
     ],
   },
