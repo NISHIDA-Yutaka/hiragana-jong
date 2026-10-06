@@ -1,9 +1,10 @@
 // 対局画面
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import type { CallOption, GameEvent, GameView } from "../../shared/protocol";
+import { handEndSeq, type CallOption, type GameEvent, type GameView } from "../../shared/protocol";
 import { emit, lsGet, lsSet, send, toast, useStore } from "../net";
 import { callSound, chime, clack, prefs, riichiSound, riipaiStart, say, setPref, shuffle, tick } from "../sound";
 import { ChatFlow } from "./ChatFlow";
+import { setKuyouPref, useKuyouPref } from "./Kuyou";
 import { CallDetailDialog, PlaceDialog, toGroups, TsumoDialog } from "./Declare";
 import { Hand } from "./Hand";
 import { FinalModal, ResultModal, VoteModal } from "./Overlays";
@@ -65,6 +66,7 @@ export function Table() {
   const [auto, setAuto] = useState(() => lsGet("auto", { tsumogiri: false }));
   const [oneClick, setOneClick] = useState(() => lsGet("oneClick", false));
   const [chatFlow, setChatFlow] = useState(() => lsGet("chatFlow", true));
+  const kuyouOn = useKuyouPref();
   const [tsumoOpen, setTsumoOpen] = useState(false);
   const [sakuPlace, setSakuPlace] = useState(false);
   const [, force] = useState(0);
@@ -184,7 +186,7 @@ export function Table() {
   const myMelds = me4?.melds ?? [];
   // 区切らずに並べた13枚へのロンは作文
   // 結果画面の鍵：その局を終わらせた出来事の番号（誰かがOKを押して状態が届いても作り直さない）
-  const resultKey = Math.max(0, ...g.events.filter((e) => ["ron", "tsumo", "ryuukyoku", "abort", "chombo"].includes(e.type)).map((e) => e.seq));
+  const resultKey = handEndSeq(g.events);
   const ronSentence = actions?.kind === "ronPlace" && myMelds.length === 0 && g.myHand.length === 13 && toGroups(g.arrangement, g.myHand).length === 1;
 
   return (
@@ -305,6 +307,10 @@ export function Table() {
                       }}
                     />
                     チャットを卓に流す
+                  </label>
+                  <label className="check">
+                    <input type="checkbox" checked={kuyouOn} onChange={(e) => setKuyouPref(e.target.checked)} />
+                    供養モード（局の終わりに手牌を供養する・見る）
                   </label>
                   {room.isHost && (
                     <button
@@ -538,7 +544,7 @@ export function Table() {
         />
       )}
       {g.phase === "vote" && g.vote && <VoteModal g={g} />}
-      {g.phase === "result" && g.result && <ResultModal key={resultKey} g={g} />}
+      {g.phase === "result" && g.result && <ResultModal key={resultKey} g={g} hand={resultKey} />}
       {g.phase === "final" && g.final && <FinalModal g={g} />}
     </div>
   );

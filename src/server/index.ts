@@ -180,6 +180,15 @@ io.on("connection", (socket) => {
     roomIO.broadcast(s.room);
   });
 
+  socket.on("game:kuyou", (p: { text?: string }, ack) => {
+    const reply = safeAck(ack);
+    const s = ctx();
+    if (!s) return reply({ error: "部屋に入っていません" });
+    const err = s.room.kuyou(s.member, String(p?.text ?? ""));
+    if (!err) roomIO.broadcast(s.room);
+    reply(err ? { error: err } : { ok: true });
+  });
+
   socket.on("room:addWord", (p: { word?: string }, ack) => {
     const reply = safeAck(ack);
     const s = ctx();

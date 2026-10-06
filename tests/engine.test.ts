@@ -1,3 +1,4 @@
+import { checkKuyou } from "../src/shared/kuyou";
 import { describe, expect, it } from "vitest";
 import { checkComplete, completeWith, groupsWithChars, reconcile } from "../src/shared/arrange";
 import { Lexicon } from "../src/shared/lexicon";
@@ -613,5 +614,21 @@ describe("理牌タイム", () => {
     // 理牌した形のまま天和を宣言できる
     game.act("a", { type: "tsumo" });
     expect(game.viewFor("a").result?.wins[0].yaku.map((y) => y.name)).toContain("天和");
+  });
+});
+
+describe("供養", () => {
+  const hand = [..."たぬききつねさくらくるまね"];
+  it("手牌を全部使い、2枚まで足せる", () => {
+    const r = checkKuyou(hand, "たぬき きつね さくら くるま ねこ");
+    expect(r.error).toBeNull();
+    expect(r.groups).toEqual(["たぬき", "きつね", "さくら", "くるま", "ねこ"]);
+    expect(r.extra).toEqual(["こ"]);
+    expect(checkKuyou(hand, "たぬき、きつね・さくら くるま ねこだ").extra).toEqual(["こ", "だ"]);
+  });
+  it("3枚以上足す・手牌を使い残す・牌にない文字はだめ", () => {
+    expect(checkKuyou(hand, "たぬき きつね さくら くるま ねこだよ").error).toContain("2枚まで");
+    expect(checkKuyou(hand, "たぬき きつね さくら くるま").error).toContain("使っていません");
+    expect(checkKuyou(hand, "たぬき きつね さくら くるま ねA").error).toContain("牌にない文字");
   });
 });

@@ -2,7 +2,8 @@
 import { randomBytes } from "crypto";
 import type { Arrangement } from "../shared/arrange";
 import { kindsOfWord, Lexicon } from "../shared/lexicon";
-import { BotLevel, ChatMessage, DEFAULT_SETTINGS, GameAction, RoomSettings, RoomView } from "../shared/protocol";
+import { BotLevel, ChatMessage, DEFAULT_SETTINGS, GameAction, handEndSeq, RoomSettings, RoomView } from "../shared/protocol";
+import { checkKuyou } from "../shared/kuyou";
 import { normalizeInput, tileSupply, toSeion } from "../shared/tiles";
 import { THEMES } from "../shared/yaku";
 import { getBaseLexicon, getBotLexicon } from "./dict";
@@ -134,6 +135,24 @@ export class Room {
     if (!t) return;
     this.chat.push({ id: ++this.chatSeq, name: m.name, text: t, ts: Date.now() });
     if (this.chat.length > 100) this.chat.shift();
+  }
+
+  /** 供養：結果画面で、自分の手牌に好きな牌を2枚まで足した完成形をみんなに見せる */
+  kuyou(m: Member, text: string): string | null {
+    const g = this.game?.viewFor(m.id);
+    if (!g || g.mySeat === null) return "対局に参加していません";
+    if (g.phase !== "result") return "供養は局が終わったときにできます";
+    const hand = handEndSeq(g.events);
+    if (this.chat.some((c) => c.kuyou?.hand === hand && c.name === m.name)) return "この局はもう供養しました";
+    const { groups, extra, error } = checkKuyou(
+      g.myHand.map((t) => t.ch),
+      String(text ?? ""),
+    );
+    if (error) return error;
+    const melds = g.seats[g.mySeat].melds.map((x) => x.word);
+    this.chat.push({ id: ++this.chatSeq, name: m.name, text: [...groups, ...melds].join("・"), ts: Date.now(), kuyou: { hand, groups, melds, extra } });
+    if (this.chat.length > 100) this.chat.shift();
+    return null;
   }
 
   /** 入力された語を、今の設定で牌として使える形にする。使えなければ null */

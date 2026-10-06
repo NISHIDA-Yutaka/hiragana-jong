@@ -1,6 +1,7 @@
 // チャットの発言を卓の上に右から左へ流す（名前＋発言）
 import { useEffect, useRef, useState } from "react";
 import { useStore } from "../net";
+import { useKuyouPref } from "./Kuyou";
 
 const LANES = 6;
 const DURATION = 8000;
@@ -17,6 +18,7 @@ interface Flow {
 
 export function ChatFlow() {
   const chat = useStore((s) => s.room?.chat ?? []);
+  const kuyouOn = useKuyouPref();
   const [flows, setFlows] = useState<Flow[]>([]);
   // 画面を開く前の発言は流さない
   const seen = useRef(chat.length ? chat[chat.length - 1].id : 0);
@@ -27,7 +29,7 @@ export function ChatFlow() {
   useEffect(() => () => timers.current.forEach(clearTimeout), []);
 
   useEffect(() => {
-    const fresh = chat.filter((m) => m.id > seen.current && !m.system);
+    const fresh = chat.filter((m) => m.id > seen.current && !m.system && (kuyouOn || !m.kuyou));
     if (chat.length) seen.current = Math.max(seen.current, chat[chat.length - 1].id);
     if (!fresh.length) return;
     const now = Date.now();
@@ -38,7 +40,7 @@ export function ChatFlow() {
       if (lane < 0) lane = free.indexOf(Math.min(...free));
       const start = Math.max(now, free[lane]);
       free[lane] = start + LANE_GAP;
-      return { id: m.id, lane, delay: start - now, name: m.name, text: m.text };
+      return { id: m.id, lane, delay: start - now, name: m.kuyou ? `🙏 ${m.name}の供養` : m.name, text: m.text };
     });
     setFlows((f) => [...f, ...add]);
     for (const x of add) {

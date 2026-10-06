@@ -65,6 +65,24 @@ export interface ChatMessage {
   text: string;
   ts: number;
   system?: boolean;
+  /** 供養：局の終わりに、手牌に好きな牌を2枚まで足して作った完成形（点数には関係しない） */
+  kuyou?: KuyouPost;
+}
+
+export interface KuyouPost {
+  /** どの局の供養か（その局を終わらせた出来事の番号） */
+  hand: number;
+  /** 手牌で作った語（作文なら1つの文） */
+  groups: string[];
+  /** 鳴いた語 */
+  melds: string[];
+  /** 自由に足した文字 */
+  extra: string[];
+}
+
+/** 局を終わらせた出来事（ロン・ツモ・流局・チョンボ）の番号。結果画面や供養をその局に結びつける */
+export function handEndSeq(events: { seq: number; type: string }[]): number {
+  return Math.max(0, ...events.filter((e) => ["ron", "tsumo", "ryuukyoku", "abort", "chombo"].includes(e.type)).map((e) => e.seq));
 }
 
 export interface RoomView {

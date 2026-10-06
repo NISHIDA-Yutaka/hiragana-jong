@@ -4,6 +4,7 @@ import type { GameView, HandResultView, WinView } from "../../shared/protocol";
 import { WIND_NAMES } from "../../shared/tiles";
 import { send, useStore } from "../net";
 import { fanfare } from "../sound";
+import { KuyouDialog, KuyouList, useKuyouPref } from "./Kuyou";
 import { Tile } from "./Tile";
 
 const fmt = (n: number) => (n * 1000).toLocaleString();
@@ -96,9 +97,15 @@ function ScoreDeltas({ r, g }: { r: HandResultView; g: GameView }) {
   );
 }
 
-export function ResultModal({ g }: { g: GameView }) {
+export function ResultModal({ g, hand }: { g: GameView; hand: number }) {
   const r = g.result!;
   const [ready, setReady] = useState(false);
+  const kuyouOn = useKuyouPref();
+  const [kuyouOpen, setKuyouOpen] = useState(false);
+  const room = useStore((s) => s.room);
+  const myName = g.mySeat !== null ? g.seats[g.mySeat].name : null;
+  const posts = (room?.chat ?? []).flatMap((m) => (m.kuyou?.hand === hand ? [{ id: m.id, name: m.name, kuyou: m.kuyou }] : []));
+  const canKuyou = kuyouOn && myName !== null && !posts.some((p) => p.name === myName);
   // 結果ごとに作り直される（Table で key を付けている）ので、効果音は開いたときに1回だけ
   useEffect(() => {
     if (r.kind === "agari") fanfare(r.wins.some((w) => w.yakuman || w.han >= 6));
@@ -152,7 +159,13 @@ export function ResultModal({ g }: { g: GameView }) {
           </div>
         )}
         <ScoreDeltas r={r} g={g} />
-        <div className="modal-foot">
+        {kuyouOn && <KuyouList posts={posts} />}
+        <div className="modal-foot gap">
+          {canKuyou && (
+            <button className="btn btn-ghost" onClick={() => setKuyouOpen(true)} title="手牌に好きな牌を2枚足した完成形をみんなに見せる（点数には関係しません）">
+              🙏 供養する
+            </button>
+          )}
           {g.mySeat !== null && !ready ? (
             <button className="btn btn-primary" onClick={ok}>
               OK
@@ -162,6 +175,7 @@ export function ResultModal({ g }: { g: GameView }) {
           )}
         </div>
       </div>
+      {kuyouOpen && <KuyouDialog g={g} hand={hand} onClose={() => setKuyouOpen(false)} />}
     </div>
   );
 }

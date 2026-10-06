@@ -120,7 +120,7 @@ export function computeYaku(inp: YakuInput): YakuResult {
   if (specialYaku && !inp.tiles.some(isSpecial)) add("清文", inp.menzen ? 2 : 1);
 
   if (inp.form === "sakubun") {
-    add("作文", 4);
+    add("作文", 3);
   } else if (inp.form === "chiitoi") {
     add("七対子", 2);
     let kaibun = 0;

@@ -2,10 +2,13 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { THEMES } from "../../shared/yaku";
 import { emit, getMyWords, send, setMyWords, toast, useStore } from "../net";
+import { KuyouHand, useKuyouPref } from "./Kuyou";
 import { openYakuWindow, YakuList } from "./YakuList";
 
 export function ChatPanel({ compact }: { compact?: boolean }) {
-  const chat = useStore((s) => s.room?.chat ?? []);
+  const all = useStore((s) => s.room?.chat ?? []);
+  const kuyouOn = useKuyouPref();
+  const chat = kuyouOn ? all : all.filter((m) => !m.kuyou);
   const [text, setText] = useState("");
   const listRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -22,8 +25,8 @@ export function ChatPanel({ compact }: { compact?: boolean }) {
       <div className="chat-list" ref={listRef}>
         {chat.map((m) => (
           <div key={m.id} className={m.system ? "chat-sys" : "chat-msg"}>
-            {!m.system && <b>{m.name}</b>}
-            <span>{m.text}</span>
+            {!m.system && <b>{m.kuyou ? `🙏 ${m.name}の供養` : m.name}</b>}
+            {m.kuyou ? <KuyouHand post={m.kuyou} size="xs" /> : <span>{m.text}</span>}
           </div>
         ))}
       </div>
