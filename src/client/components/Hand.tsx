@@ -18,6 +18,8 @@ interface Props {
   onDiscard: (id: number) => void;
   scale: number;
   meldCount: number;
+  /** 観戦用：サーバーの並びをそのまま見せるだけで、触れない */
+  readOnly?: boolean;
 }
 
 function withoutId(arr: Arrangement, id: number): Arrangement {
@@ -30,7 +32,7 @@ function withoutId(arr: Arrangement, id: number): Arrangement {
   return { order, breaks: [...breaks] };
 }
 
-export function Hand({ hand, serverArr, drawnId, discardable, highlight, oneClick, onDiscard, scale, meldCount }: Props) {
+export function Hand({ hand, serverArr, drawnId, discardable, highlight, oneClick, onDiscard, scale, meldCount, readOnly = false }: Props) {
   const handKey = useMemo(
     () =>
       hand
@@ -59,7 +61,14 @@ export function Hand({ hand, serverArr, drawnId, discardable, highlight, oneClic
 
   const byId = useMemo(() => new Map(hand.map((t) => [t.id, t])), [hand]);
   const valid = arr.order.length === hand.length && arr.order.every((id) => byId.has(id));
-  const cur: Arrangement = valid ? arr : (serverArr ?? { order: hand.map((t) => t.id), breaks: [] });
+  const serverValid = !!serverArr && serverArr.order.length === hand.length && serverArr.order.every((id) => byId.has(id));
+  const cur: Arrangement = readOnly
+    ? serverValid
+      ? serverArr!
+      : { order: hand.map((t) => t.id), breaks: [] }
+    : valid
+      ? arr
+      : (serverArr ?? { order: hand.map((t) => t.id), breaks: [] });
 
   // 牌の位置を覚えておき、並びが変わったら前の位置から滑らせる（FLIP）
   const lastRects = useRef<Map<number, DOMRect>>(new Map());
@@ -131,7 +140,7 @@ export function Hand({ hand, serverArr, drawnId, discardable, highlight, oneClic
 
   // ---------------------------------------------------------------- ドラッグ
   const onDown = (e: RPointerEvent<HTMLDivElement>, id: number) => {
-    if (e.button !== 0) return;
+    if (e.button !== 0 || readOnly) return;
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
     tilePick();
     setDrag({ id, x0: e.clientX, y0: e.clientY, dx: 0, dy: 0, active: false });
@@ -282,14 +291,17 @@ export function Hand({ hand, serverArr, drawnId, discardable, highlight, oneClic
                     style={isDrag ? { transform: `translate(${drag!.dx / scale}px, ${drag!.dy / scale}px)` } : undefined}
                     onPointerDown={(e) => onDown(e, id)}
                   />
-                  {(i < g.length - 1 || gi < groups.length - 1) && (
+                  {(i < g.length - 1 || gi < groups.length - 1) &&
+                    (readOnly ? (
+                      <span className={`seam seam-ro ${i === g.length - 1 ? "seam-open" : ""}`} />
+                    ) : (
                     <button
                       className={`seam ${i === g.length - 1 ? "seam-open" : ""}`}
                       title={i === g.length - 1 ? "つなげる" : "ここで区切る"}
                       onClick={() => toggleBreak(id)}
                       tabIndex={-1}
                     />
-                  )}
+                    ))}
                 </div>
               );
             })}
@@ -300,15 +312,19 @@ export function Hand({ hand, serverArr, drawnId, discardable, highlight, oneClic
         <span className={`shape ${shape.cls}`} title="区切った語の文字数（言葉として正しいかは判定しません）">
           {shape.text}
         </span>
-        <form onSubmit={gather} className="gather">
-          <input value={typed} onChange={(e) => setTyped(e.target.value)} placeholder="語を入力 → Enterで牌を集める" />
-        </form>
-        <button className="btn btn-xs btn-ghost" onClick={splitAll} title="全ての牌を1枚ずつに区切る">
-          全部区切る
-        </button>
-        <button className="btn btn-xs btn-ghost" onClick={resetSort} title="五十音順に並べ直す（区切りも消えます）">
-          リセット
-        </button>
+        {!readOnly && (
+          <>
+            <form onSubmit={gather} className="gather">
+              <input value={typed} onChange={(e) => setTyped(e.target.value)} placeholder="語を入力 → Enterで牌を集める" />
+            </form>
+            <button className="btn btn-xs btn-ghost" onClick={splitAll} title="全ての牌を1枚ずつに区切る">
+              全部区切る
+            </button>
+            <button className="btn btn-xs btn-ghost" onClick={resetSort} title="五十音順に並べ直す（区切りも消えます）">
+              リセット
+            </button>
+          </>
+        )}
       </div>
     </div>
   );

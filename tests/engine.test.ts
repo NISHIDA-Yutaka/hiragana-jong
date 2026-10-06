@@ -632,3 +632,18 @@ describe("供養", () => {
     expect(checkKuyou(hand, "たぬき きつね さくら くるま ねA").error).toContain("牌にない文字");
   });
 });
+
+describe("観戦", () => {
+  it("観戦者は選んだ参加者の手牌と並びを見る（操作はできない）", () => {
+    const { game } = makeGame(rigWall("ねこさくらくるまたぬききつ", "いぬそらやまかさはないすと", "そ"));
+    arrangeAs(game, "b", ["いぬ", "そら", "やま", "かさ", "はな", "いす", "と"]);
+    const v = game.viewFor("spectator", 1);
+    expect(v.mySeat).toBeNull();
+    expect(v.watchSeat).toBe(1);
+    expect(v.myHand.map((t) => t.ch).sort()).toEqual(game.viewFor("b").myHand.map((t) => t.ch).sort());
+    expect(v.arrangement).toEqual(game.viewFor("b").arrangement);
+    expect(v.actions).toBeNull();
+    // 席を選ばなければ手牌は見えない
+    expect(game.viewFor("spectator").myHand).toEqual([]);
+  });
+});

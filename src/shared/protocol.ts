@@ -264,6 +264,8 @@ export interface GameView {
   myHand: Tile[];
   drawnId: number | null;
   arrangement: Arrangement | null;
+  /** 観戦者が手元を見ている席（myHand・arrangement・drawnId はその人のもの）。参加者は null */
+  watchSeat: number | null;
   actions: ActionsView | null;
   deadline: number | null;
   bank: number;

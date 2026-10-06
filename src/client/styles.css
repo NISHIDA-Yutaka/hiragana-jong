@@ -1685,16 +1685,44 @@ fieldset:disabled .seg button:not(.on) {
   border-radius: 12px;
   background: rgba(0, 0, 0, 0.6);
 }
-.spectator-note {
+/* 観戦：手元を見る参加者を切り替える */
+.spectator-bar {
   position: absolute;
-  bottom: 40px;
+  top: 56px;
   left: 50%;
   transform: translateX(-50%);
-  font-size: 20px;
-  color: var(--gold);
-  background: rgba(0, 0, 0, 0.5);
-  padding: 8px 20px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(0, 0, 0, 0.55);
+  padding: 6px 8px 6px 16px;
   border-radius: 999px;
+  z-index: 15;
+}
+.spectator-bar span {
+  color: var(--gold);
+  font-weight: 700;
+  margin-right: 4px;
+}
+.spectator-bar button {
+  border: 0;
+  border-radius: 999px;
+  padding: 6px 14px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.08);
+  cursor: pointer;
+}
+.spectator-bar button.on {
+  background: linear-gradient(#f1d27e, #c99a3c);
+  color: #3a2608;
+}
+.seam-ro {
+  display: block;
+  cursor: default;
+  pointer-events: none;
 }
 
 /* 発声の演出 */

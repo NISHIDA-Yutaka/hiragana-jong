@@ -57,8 +57,10 @@ export function Table() {
   const g = useStore((s) => s.game)!;
   const room = useStore((s) => s.room)!;
   const scale = useStageScale();
-  const me = g.mySeat ?? 0;
+  // 観戦者は、選んだ参加者の席から見る（その人の手牌を自分の手牌の位置に出す）
+  const me = g.mySeat ?? g.watchSeat ?? 0;
   const spectator = g.mySeat === null;
+  const watching = spectator ? g.watchSeat : null;
   const [panel, setPanel] = useState<null | "chat" | "words" | "theme" | "room" | "tiles" | "yaku" | "settings">(null);
   const [callouts, setCallouts] = useState<Callout[]>([]);
   const [riichiMode, setRiichiMode] = useState<null | "riichi" | "open">(null);
@@ -197,7 +199,7 @@ export function Table() {
           <div className="table-square">
             <CenterBox g={g} mySeat={me} />
             {g.seats.map((s) => (
-              <SeatZone key={s.seat} n={g.n} s={s} pos={posFor(s.seat, me, g.n)} isMe={!spectator && s.seat === me} lastDiscardId={g.lastDiscard?.seat === s.seat ? g.lastDiscard.tileId : null} isTurn={g.turn === s.seat} />
+              <SeatZone key={s.seat} n={g.n} s={s} pos={posFor(s.seat, me, g.n)} isMe={(!spectator || watching !== null) && s.seat === me} lastDiscardId={g.lastDiscard?.seat === s.seat ? g.lastDiscard.tileId : null} isTurn={g.turn === s.seat} />
             ))}
           </div>
         </div>
@@ -480,7 +482,39 @@ export function Table() {
             </div>
           </>
         )}
-        {spectator && <div className="spectator-note">観戦中</div>}
+        {spectator && watching !== null && (
+          <div className="bottom-area">
+            <Hand
+              key={watching}
+              hand={g.myHand}
+              serverArr={g.arrangement}
+              drawnId={g.drawnId}
+              discardable={null}
+              highlight={null}
+              oneClick={false}
+              onDiscard={() => {}}
+              scale={scale}
+              meldCount={myMelds.length}
+              readOnly
+            />
+            <div className="my-melds">
+              {myMelds.map((m, i) => (
+                <Meld key={i} m={m} size="sm" />
+              ))}
+            </div>
+          </div>
+        )}
+        {spectator && (
+          <div className="spectator-bar">
+            <span>観戦中</span>
+            {g.seats.map((s) => (
+              <button key={s.seat} className={s.seat === watching ? "on" : ""} onClick={() => send("spectate:watch", { seat: s.seat })} title={`${s.name}の手元を見る`}>
+                {s.isBot ? "🤖 " : ""}
+                {s.name}
+              </button>
+            ))}
+          </div>
+        )}
         {g.notice && <div className="notice-banner">{g.notice}</div>}
         {g.riipai && <RiipaiBoard r={g.riipai} />}
       </div>

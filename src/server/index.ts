@@ -26,7 +26,7 @@ const roomIO = {
     for (const m of room.members) {
       if (m.isBot) continue;
       const rv = room.view(m.id);
-      const gv = room.game ? room.game.viewFor(m.id) : null;
+      const gv = room.gameView(m);
       for (const sid of m.sockets) {
         io.to(sid).emit("room:state", rv);
         io.to(sid).emit("game:state", gv);
@@ -180,6 +180,12 @@ io.on("connection", (socket) => {
     roomIO.broadcast(s.room);
   });
 
+  socket.on("spectate:watch", (p: { seat?: number }) => {
+    const s = ctx();
+    if (!s || !s.room.game) return;
+    s.room.watch(s.member, Number(p?.seat));
+    socket.emit("game:state", s.room.gameView(s.member));
+  });
   socket.on("game:kuyouStart", () => ctx()?.room.kuyouStart(ctx()!.member));
   socket.on("game:kuyou", (p: { text?: string }, ack) => {
     const reply = safeAck(ack);
@@ -248,8 +254,15 @@ io.on("connection", (socket) => {
     } catch (e) {
       console.error("[arrange]", e);
     }
-    // 自分にだけ送り直す（ボタンの状態が変わるため）
-    if (s.room.game) socket.emit("game:state", s.room.game.viewFor(s.member.id));
+    // 自分にだけ送り直す（ボタンの状態が変わるため）。観戦者にも送り、理牌や並べ替えをその場で見せる
+    if (s.room.game) {
+      socket.emit("game:state", s.room.gameView(s.member));
+      for (const m of s.room.members) {
+        if (m.isBot || s.room.seatedIds.includes(m.id)) continue;
+        const v = s.room.gameView(m);
+        for (const sid of m.sockets) io.to(sid).emit("game:state", v);
+      }
+    }
   });
 
   socket.on("disconnect", () => detach(socket));

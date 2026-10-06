@@ -1629,9 +1629,11 @@ export class Game {
 
   // ------------------------------------------------------------------ 表示用データ
 
-  viewFor(playerId: string | null): GameView {
+  /** watch：観戦者が手元を見ている席（その人の手牌と並びを、自分の手牌の位置に見せる） */
+  viewFor(playerId: string | null, watch?: number): GameView {
     const me = playerId ? this.seatOf(playerId) : -1;
     const mySeat = me >= 0 ? me : null;
+    const watchSeat = mySeat === null && watch !== undefined && Number.isInteger(watch) && watch >= 0 && watch < this.n ? watch : null;
     const seats: SeatView[] = this.players.map((p, s) => {
       const hp = this.hands[s];
       const open = hp.riichi?.open;
@@ -1713,9 +1715,10 @@ export class Game {
       phase: this.step === "turn" ? "play" : this.step,
       notice,
       lengthLabel,
-      myHand: hp ? hp.hand : [],
-      drawnId: hp ? hp.drawnId : null,
-      arrangement: hp ? hp.arr : null,
+      myHand: hp ? hp.hand : watchSeat !== null ? this.hands[watchSeat].hand : [],
+      drawnId: hp ? hp.drawnId : watchSeat !== null ? this.hands[watchSeat].drawnId : null,
+      arrangement: hp ? hp.arr : watchSeat !== null ? this.hands[watchSeat].arr : null,
+      watchSeat,
       actions,
       deadline,
       bank: hp ? Math.round(hp.bank) : 0,
@@ -1734,7 +1737,7 @@ export class Game {
             }
           : null,
       readyWaiting: this.step === "result" ? this.players.filter((_, i) => !this.ready.has(i)).map((p) => p.name) : [],
-      myTheme: playerId ? this.hooks.theme(playerId) : null,
+      myTheme: playerId && mySeat !== null ? this.hooks.theme(playerId) : watchSeat !== null ? this.hooks.theme(this.players[watchSeat].id) : null,
     };
   }
 }

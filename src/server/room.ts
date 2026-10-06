@@ -40,6 +40,8 @@ export class Room {
   game: Game | null = null;
   /** 対局に参加しているメンバーID */
   seatedIds: string[] = [];
+  /** 観戦者が手元を見ている席（メンバーID → 席） */
+  watching = new Map<string, number>();
   lastActive = Date.now();
   private chatSeq = 0;
   private roomLexCache: Lexicon | null = null;
@@ -135,6 +137,24 @@ export class Room {
     if (!t) return;
     this.chat.push({ id: ++this.chatSeq, name: m.name, text: t, ts: Date.now() });
     if (this.chat.length > 100) this.chat.shift();
+  }
+
+  /** そのメンバー向けの対局の表示。観戦者には選んだ参加者の手元を見せる（未選択なら人間の参加者の最初の席） */
+  gameView(m: Member) {
+    if (!this.game) return null;
+    if (this.seatedIds.includes(m.id)) return this.game.viewFor(m.id);
+    let seat = this.watching.get(m.id);
+    if (seat === undefined) {
+      const human = this.seatedIds.findIndex((id) => !this.member(id)?.isBot);
+      seat = human >= 0 ? human : 0;
+    }
+    return this.game.viewFor(m.id, seat);
+  }
+
+  /** 観戦者が手元を見る参加者を切り替える */
+  watch(m: Member, seat: number) {
+    if (this.seatedIds.includes(m.id) || !Number.isInteger(seat) || seat < 0 || seat >= this.seatedIds.length) return;
+    this.watching.set(m.id, seat);
   }
 
   /** 供養を書き始めた：結果画面を自動で進めずに待つ */
@@ -273,6 +293,7 @@ export class Room {
     }
     this.game?.destroy();
     this.seatedIds = seated.map((m) => m.id);
+    this.watching.clear(); // 席順が変わるので、観戦で見ている席は選び直し
     const cfg = this.dictConfig();
     this.roomLex(); // 辞書を先に用意
     this.game = new Game({
