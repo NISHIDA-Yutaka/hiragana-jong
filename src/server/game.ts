@@ -1374,6 +1374,13 @@ export class Game {
     if (this.ready.size === this.n) this.setTimer("result", this.fast ? 0 : 6000, () => this.proceedFromResult());
   }
 
+  /** 供養を書いている人がいる間は、結果画面を自動で進めない（書き始めてから2分まで待つ） */
+  holdResult(playerId: string) {
+    const seat = this.seatOf(playerId);
+    if (seat < 0 || this.step !== "result" || this.ready.has(seat)) return;
+    this.setTimer("result", this.fast ? 0 : 120000, () => this.proceedFromResult());
+  }
+
   private markReady(seat: number) {
     if (this.step !== "result") return;
     this.ready.add(seat);

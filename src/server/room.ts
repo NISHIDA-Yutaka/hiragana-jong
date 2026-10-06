@@ -137,6 +137,11 @@ export class Room {
     if (this.chat.length > 100) this.chat.shift();
   }
 
+  /** 供養を書き始めた：結果画面を自動で進めずに待つ */
+  kuyouStart(m: Member) {
+    this.game?.holdResult(m.id);
+  }
+
   /** 供養：結果画面で、自分の手牌に好きな牌を2枚まで足した完成形をみんなに見せる */
   kuyou(m: Member, text: string): string | null {
     const g = this.game?.viewFor(m.id);

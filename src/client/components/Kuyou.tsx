@@ -1,8 +1,8 @@
 // 供養：局の終わりに、手牌に好きな牌を2枚まで足した完成形をみんなに見せる（点数には関係しない）
-import { FormEvent, useState, useSyncExternalStore } from "react";
+import { FormEvent, useEffect, useState, useSyncExternalStore } from "react";
 import { checkKuyou, KUYOU_EXTRA } from "../../shared/kuyou";
 import type { GameView, KuyouPost } from "../../shared/protocol";
-import { emit, lsGet, lsSet, toast } from "../net";
+import { emit, lsGet, lsSet, send, toast } from "../net";
 import { Tile } from "./Tile";
 
 // ---------------------------------------------------------------- 各自の設定（いつでもOFFにできる）
@@ -86,6 +86,10 @@ export function KuyouList({ posts }: { posts: { id: number; name: string; kuyou:
 
 export function KuyouDialog({ g, hand, onClose }: { g: GameView; hand: number; onClose: () => void }) {
   const [text, setText] = useState("");
+  // 書いている間は結果画面を自動で進めないよう、サーバーに知らせる
+  useEffect(() => {
+    send("game:kuyouStart");
+  }, []);
   const chars = g.myHand.map((t) => t.ch);
   const melds = g.mySeat !== null ? g.seats[g.mySeat].melds.map((m) => m.word) : [];
   const res = checkKuyou(chars, text);

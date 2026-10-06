@@ -180,6 +180,7 @@ io.on("connection", (socket) => {
     roomIO.broadcast(s.room);
   });
 
+  socket.on("game:kuyouStart", () => ctx()?.room.kuyouStart(ctx()!.member));
   socket.on("game:kuyou", (p: { text?: string }, ack) => {
     const reply = safeAck(ack);
     const s = ctx();
