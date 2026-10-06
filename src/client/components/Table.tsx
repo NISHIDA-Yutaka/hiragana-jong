@@ -504,6 +504,17 @@ export function Table() {
             </div>
           </div>
         )}
+        {spectator && watching !== null && (
+          <>
+            {/* 左右の矢印で、席順に前の人・次の人の手元へ */}
+            <button className="spec-nav spec-prev" onClick={() => send("spectate:watch", { seat: (watching + g.n - 1) % g.n })} title={`${g.seats[(watching + g.n - 1) % g.n].name}の手元を見る`}>
+              ‹<small>{g.seats[(watching + g.n - 1) % g.n].name}</small>
+            </button>
+            <button className="spec-nav spec-next" onClick={() => send("spectate:watch", { seat: (watching + 1) % g.n })} title={`${g.seats[(watching + 1) % g.n].name}の手元を見る`}>
+              ›<small>{g.seats[(watching + 1) % g.n].name}</small>
+            </button>
+          </>
+        )}
         {spectator && (
           <div className="spectator-bar">
             <span>観戦中</span>
