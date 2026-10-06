@@ -122,6 +122,24 @@ export function Table() {
     else chime();
   }, [g.riipai]);
 
+  // 観戦：前・次の参加者の手元へ（←→キーでも）
+  const watchStep = (d: 1 | -1) => {
+    if (watching === null) return;
+    send("spectate:watch", { seat: (watching + d + g.n) % g.n });
+  };
+  useEffect(() => {
+    if (watching === null) return;
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
+      if (e.key === "ArrowLeft") watchStep(-1);
+      else if (e.key === "ArrowRight") watchStep(1);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [watching, g.n]);
+
   // 持ち時間表示
   useEffect(() => {
     if (!g.deadline) return;
@@ -506,13 +524,19 @@ export function Table() {
         )}
         {spectator && watching !== null && (
           <>
-            {/* 左右の矢印で、席順に前の人・次の人の手元へ */}
-            <button className="spec-nav spec-prev" onClick={() => send("spectate:watch", { seat: (watching + g.n - 1) % g.n })} title={`${g.seats[(watching + g.n - 1) % g.n].name}の手元を見る`}>
-              ‹<small>{g.seats[(watching + g.n - 1) % g.n].name}</small>
-            </button>
-            <button className="spec-nav spec-next" onClick={() => send("spectate:watch", { seat: (watching + 1) % g.n })} title={`${g.seats[(watching + 1) % g.n].name}の手元を見る`}>
-              ›<small>{g.seats[(watching + 1) % g.n].name}</small>
-            </button>
+            {/* 左右の矢印（←→キーでも）で、席順に前の人・次の人の手元へ */}
+            <div className="spec-nav spec-prev">
+              <button onClick={() => watchStep(-1)} title={`${g.seats[(watching + g.n - 1) % g.n].name}の手元を見る（←キー）`}>
+                ‹
+              </button>
+              <span>{g.seats[(watching + g.n - 1) % g.n].name}</span>
+            </div>
+            <div className="spec-nav spec-next">
+              <button onClick={() => watchStep(1)} title={`${g.seats[(watching + 1) % g.n].name}の手元を見る（→キー）`}>
+                ›
+              </button>
+              <span>{g.seats[(watching + 1) % g.n].name}</span>
+            </div>
           </>
         )}
         {spectator && (

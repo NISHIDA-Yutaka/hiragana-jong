@@ -1724,37 +1724,44 @@ fieldset:disabled .seg button:not(.on) {
   /* 左右の牌山と、左下の名札・手牌のあいだの空いているところ */
   top: 600px;
   z-index: 15;
-  width: 84px;
-  height: 84px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 150px;
+}
+.spec-nav button {
+  width: 76px;
+  height: 76px;
   border-radius: 50%;
   border: 1px solid var(--panel-line);
   background: rgba(0, 0, 0, 0.5);
   color: var(--gold);
-  font-size: 54px;
+  font-size: 56px;
   line-height: 1;
+  padding: 0 0 8px;
   cursor: pointer;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 0 0 6px;
 }
-.spec-nav small {
-  font-size: 11px;
+.spec-nav button:hover {
+  background: rgba(0, 0, 0, 0.7);
+}
+.spec-nav span {
+  font-size: 15px;
+  font-weight: 700;
   color: var(--text);
-  max-width: 76px;
+  background: rgba(0, 0, 0, 0.45);
+  padding: 3px 12px;
+  border-radius: 999px;
+  max-width: 150px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.spec-nav:hover {
-  background: rgba(0, 0, 0, 0.7);
-}
 .spec-prev {
-  left: 130px;
+  left: 95px;
 }
 .spec-next {
-  right: 130px;
+  right: 95px;
 }
 .seam-ro {
   display: block;
