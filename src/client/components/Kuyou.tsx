@@ -29,8 +29,11 @@ export function useKuyouPref() {
 
 // ---------------------------------------------------------------- 表示
 
-/** 供養の完成形。足した牌は印をつける */
-export function KuyouHand({ post, size = "sm" }: { post: KuyouPost; size?: "xs" | "sm" }) {
+/**
+ * 供養の完成形。足した牌は印をつける。
+ * joined：区切りのすき間を詰めて1列に並べる（作文のアガリと同じ見せ方。入力中のプレビュー以外はこちら）
+ */
+export function KuyouHand({ post, size = "sm", joined = false }: { post: KuyouPost; size?: "xs" | "sm"; joined?: boolean }) {
   // 足した文字は、後ろから見て最初に出てくるものに印をつける
   const marks = new Set<string>();
   const left = [...post.extra];
@@ -46,13 +49,19 @@ export function KuyouHand({ post, size = "sm" }: { post: KuyouPost; size?: "xs" 
   }
   return (
     <div className="kuyou-hand">
-      {post.groups.map((w, gi) => (
-        <span key={gi} className="kuyou-group">
-          {[...w].map((ch, ci) => (
-            <Tile key={ci} ch={ch} size={size} className={marks.has(`${gi}:${ci}`) ? "kuyou-extra" : ""} />
-          ))}
+      {joined ? (
+        <span className="kuyou-group">
+          {post.groups.flatMap((w, gi) => [...w].map((ch, ci) => <Tile key={`${gi}:${ci}`} ch={ch} size={size} className={marks.has(`${gi}:${ci}`) ? "kuyou-extra" : ""} />))}
         </span>
-      ))}
+      ) : (
+        post.groups.map((w, gi) => (
+          <span key={gi} className="kuyou-group">
+            {[...w].map((ch, ci) => (
+              <Tile key={ci} ch={ch} size={size} className={marks.has(`${gi}:${ci}`) ? "kuyou-extra" : ""} />
+            ))}
+          </span>
+        ))
+      )}
       {post.melds.map((w, i) => (
         <span key={`m${i}`} className="kuyou-group kuyou-meld">
           {[...w].map((ch, ci) => (
@@ -74,8 +83,8 @@ export function KuyouList({ posts }: { posts: { id: number; name: string; kuyou:
           <div className="kuyou-who">
             🙏 {p.name}の供養<small>（光っている牌が足した牌）</small>
           </div>
-          <KuyouHand post={p.kuyou} />
-          <div className="kuyou-words">{[...p.kuyou.groups, ...p.kuyou.melds].join("・")}</div>
+          <KuyouHand post={p.kuyou} joined />
+          <div className="kuyou-words">{[p.kuyou.groups.join(""), ...p.kuyou.melds].join("・")}</div>
         </div>
       ))}
     </div>

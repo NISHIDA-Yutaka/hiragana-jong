@@ -26,7 +26,7 @@ export function ChatPanel({ compact }: { compact?: boolean }) {
         {chat.map((m) => (
           <div key={m.id} className={m.system ? "chat-sys" : "chat-msg"}>
             {!m.system && <b>{m.kuyou ? `🙏 ${m.name}の供養` : m.name}</b>}
-            {m.kuyou ? <KuyouHand post={m.kuyou} size="xs" /> : <span>{m.text}</span>}
+            {m.kuyou ? <KuyouHand post={m.kuyou} size="xs" joined /> : <span>{m.text}</span>}
           </div>
         ))}
       </div>

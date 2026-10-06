@@ -155,7 +155,7 @@ export class Room {
     );
     if (error) return error;
     const melds = g.seats[g.mySeat].melds.map((x) => x.word);
-    this.chat.push({ id: ++this.chatSeq, name: m.name, text: [...groups, ...melds].join("・"), ts: Date.now(), kuyou: { hand, groups, melds, extra } });
+    this.chat.push({ id: ++this.chatSeq, name: m.name, text: [groups.join(""), ...melds].join("・"), ts: Date.now(), kuyou: { hand, groups, melds, extra } });
     if (this.chat.length > 100) this.chat.shift();
     return null;
   }
