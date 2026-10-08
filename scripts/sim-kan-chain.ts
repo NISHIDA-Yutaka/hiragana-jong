@@ -7,14 +7,15 @@
 //  - カンする語の選び方は、山の並びを知っている前提で一番よいものを選ぶ（＝上限の見積もり）
 //  - 語は辞書（広い／常用語のみ）にあるものだけ。役は三槓子（カン3つ）で必ず付く
 //
-// 使い方：npx tsx scripts/sim-kan-chain.ts [試行回数]
+// 使い方：npx tsx scripts/sim-kan-chain.ts [試行回数]（追加牌ありは EXTRA=1）
 import { canStandard } from "../src/shared/analysis";
 import { kindsOfWord } from "../src/shared/lexicon";
 import { NUM_KINDS, tileSupply } from "../src/shared/tiles";
 import { getBaseLexicon, getWordList } from "../src/server/dict";
 
 const TRIALS = Number(process.argv[2] ?? 3000);
-const supply = tileSupply(false);
+const EXTRA = process.env.EXTRA === "1";
+const supply = tileSupply(EXTRA);
 
 let seed = 12345;
 const rnd = () => {
@@ -39,7 +40,7 @@ function maskOf(kinds: number[]): [number, number, number] {
 }
 
 function run(level: "full" | "common") {
-  const lex = getBaseLexicon({ level, seion: false, extraTiles: false });
+  const lex = getBaseLexicon({ level, seion: false, extraTiles: EXTRA });
   const kanWords: KanWord[] = [];
   for (const e of getWordList()) {
     const n = [...e.word].length;
@@ -124,7 +125,7 @@ const pct = (n: number) => `${((n / TRIALS) * 100).toFixed(2)}%`;
 for (const level of ["full", "common"] as const) {
   const t = Date.now();
   const res = run(level);
-  console.log(`\n=== 辞書：${level === "full" ? "広い（約20万語）" : "常用語のみ"}　試行 ${TRIALS} 回ずつ（${((Date.now() - t) / 1000).toFixed(1)}秒）`);
+  console.log(`\n=== ${EXTRA ? "追加牌あり" : "追加牌なし"}・辞書：${level === "full" ? "広い（約20万語）" : "常用語のみ"}　試行 ${TRIALS} 回ずつ（${((Date.now() - t) / 1000).toFixed(1)}秒）`);
   console.log("最初のカン | 2つ目のカンまで行ける | 三槓子でアガリ | 四槓子でアガリ | 三槓子以上の合計 | カン1〜2つで嶺上アガリ");
   for (const [n, r] of Object.entries(res)) {
     console.log(`${n}文字 | ${pct(r.chain2)} | ${pct(r.kan3)} | ${pct(r.kan4)} | ${pct(r.kan3 + r.kan4)} | ${pct(r.early)}`);
