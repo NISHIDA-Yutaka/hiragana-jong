@@ -12,7 +12,6 @@ import type {
   GameEvent,
   GameView,
   HandResultView,
-  FuritenReason,
   MeldType,
   RoomSettings,
   SeatView,
@@ -611,7 +610,8 @@ export class Game {
     return this.furitenReason(seat, ch) !== null;
   }
 
-  private furitenReason(seat: number, ch: string): FuritenReason | null {
+  /** フリテンの理由：自分で捨てた／リーチ後に見逃した／見逃した（次のツモまで） */
+  private furitenReason(seat: number, ch: string): "discard" | "riichi" | "missed" | null {
     const hp = this.hands[seat];
     if (hp.discards.some((d) => d.tile.ch === ch)) return "discard";
     if (hp.riichiFuriten.has(ch)) return "riichi";
@@ -701,8 +701,13 @@ export class Game {
     {
       const hp = this.hands[seat];
       if (r.call === "ron" && hp.called) return "ポン・カンをした局はロンできません";
-      // フリテンのロンは受け付けない（チョンボにせず、押せないようにする）
-      if (r.call === "ron" && this.isFuriten(seat, this.lastDiscard!.tile.ch)) return `フリテンのため「${this.lastDiscard!.tile.ch}」ではロンできません`;
+      // フリテンのロンは受け付けず、押した人にだけ理由を知らせる（チョンボを防ぐ）。
+      // 捨て牌のたびに知らせると「その文字でアガれる」ことを教えてしまうので、ロンを押したときだけにしている
+      if (r.call === "ron") {
+        const ch = this.lastDiscard!.tile.ch;
+        const why = this.furitenReason(seat, ch);
+        if (why) return `フリテンです：${{ discard: `「${ch}」を捨てています`, riichi: `リーチ後に「${ch}」を見逃しています`, missed: `「${ch}」を見逃したばかりです（次のツモまで）` }[why]}。この牌ではロンできません`;
+      }
       if (r.call === "pon" && !cs.canPon) return "ポンできません";
       if (r.call === "kan" && !cs.canKan) return "カンできません";
       cs.response = r;
@@ -1673,8 +1678,7 @@ export class Game {
         const cs = this.calls.get(mySeat);
         if (cs && !cs.response) {
           const hp = this.hands[mySeat];
-          const furiten = this.furitenReason(mySeat, this.lastDiscard!.tile.ch);
-          actions = { kind: "call", ron: !hp.called && !furiten, tile: this.lastDiscard!.tile, fromSeat: this.lastDiscard!.seat, canPon: cs.canPon, canKan: cs.canKan, furiten };
+          actions = { kind: "call", ron: !hp.called, tile: this.lastDiscard!.tile, fromSeat: this.lastDiscard!.seat, canPon: cs.canPon, canKan: cs.canKan };
           deadline = this.windowDeadline;
         }
       } else if (this.step === "claim") {

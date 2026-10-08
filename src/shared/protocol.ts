@@ -59,9 +59,6 @@ export interface RoomPlayerView {
   isHost: boolean;
 }
 
-/** フリテンの理由：自分で捨てた／見逃した（次のツモまで）／リーチ後に見逃した */
-export type FuritenReason = "discard" | "missed" | "riichi";
-
 export interface ChatMessage {
   id: number;
   name: string;
@@ -162,8 +159,6 @@ export type ActionsView =
       fromSeat: number;
       canPon: boolean;
       canKan: boolean;
-      /** この捨て牌の文字でフリテン（ロンできない）なら、その理由。チョンボを防ぐための警告 */
-      furiten: FuritenReason | null;
     }
   | {
       /** 自己申告のロン：ロン牌をどの語のどこに入れるか選ぶ */

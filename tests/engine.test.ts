@@ -305,7 +305,7 @@ describe("自己申告", () => {
     expect(game.viewFor("a").result?.kind).toBe("chombo");
   });
 
-  it("フリテンのロンは押せない（警告を出し、チョンボにはしない）", () => {
+  it("フリテンのロンは、押したときに理由を出して受け付けない（チョンボにはしない）", () => {
     const { game } = makeGame(rigWall("ららいぬそやまかはないすそ", "ねこさくくるまたぬききつね", "とら"));
     game.act("a", { type: "discard", tileId: game.viewFor("a").myHand.find((t) => t.ch === "そ")!.id });
     game.act("b", { type: "call", call: "pass" });
@@ -313,11 +313,13 @@ describe("自己申告", () => {
     game.act("b", { type: "discard", tileId: game.viewFor("b").drawnId! });
     game.act("a", { type: "call", call: "pass" });
     game.act("a", { type: "discard", tileId: game.viewFor("a").myHand.find((t) => t.ch === "ら")!.id });
+    // 捨て牌の時点では何も知らせない（ロンは押せる）
     const v = game.viewFor("b");
     if (v.actions?.kind !== "call") throw new Error("not call");
-    expect(v.actions.furiten).toBe("discard");
-    expect(v.actions.ron).toBe(false);
-    expect(game.act("b", { type: "call", call: "ron" })).toContain("フリテン");
+    expect(v.actions.ron).toBe(true);
+    expect(game.act("b", { type: "call", call: "ron" })).toBe("フリテンです：「ら」を捨てています。この牌ではロンできません");
+    // 断られたあとも、まだ見送り・ポンなどを選べる
+    expect(game.viewFor("b").actions?.kind).toBe("call");
     expect(game.viewFor("a").result).toBeNull();
   });
 
