@@ -2856,3 +2856,15 @@ fieldset:disabled .seg button:not(.on) {
   gap: 6px;
   margin: 2px 0;
 }
+
+/* フリテンの警告（その文字ではロンできない） */
+.furiten-warn {
+  align-self: center;
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
+  background: rgba(200, 65, 44, 0.9);
+  border-radius: 999px;
+  padding: 6px 14px;
+  white-space: nowrap;
+}

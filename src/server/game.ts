@@ -12,6 +12,7 @@ import type {
   GameEvent,
   GameView,
   HandResultView,
+  FuritenReason,
   MeldType,
   RoomSettings,
   SeatView,
@@ -607,8 +608,15 @@ export class Game {
    * 遊ぶ人が把握できる「同じ文字」に絞っている
    */
   private isFuriten(seat: number, ch: string) {
+    return this.furitenReason(seat, ch) !== null;
+  }
+
+  private furitenReason(seat: number, ch: string): FuritenReason | null {
     const hp = this.hands[seat];
-    return hp.discards.some((d) => d.tile.ch === ch) || hp.tempFuriten.has(ch) || hp.riichiFuriten.has(ch);
+    if (hp.discards.some((d) => d.tile.ch === ch)) return "discard";
+    if (hp.riichiFuriten.has(ch)) return "riichi";
+    if (hp.tempFuriten.has(ch)) return "missed";
+    return null;
   }
 
   /** ロンできた牌を見逃した */
@@ -693,6 +701,8 @@ export class Game {
     {
       const hp = this.hands[seat];
       if (r.call === "ron" && hp.called) return "ポン・カンをした局はロンできません";
+      // フリテンのロンは受け付けない（チョンボにせず、押せないようにする）
+      if (r.call === "ron" && this.isFuriten(seat, this.lastDiscard!.tile.ch)) return `フリテンのため「${this.lastDiscard!.tile.ch}」ではロンできません`;
       if (r.call === "pon" && !cs.canPon) return "ポンできません";
       if (r.call === "kan" && !cs.canKan) return "カンできません";
       cs.response = r;
@@ -1663,7 +1673,8 @@ export class Game {
         const cs = this.calls.get(mySeat);
         if (cs && !cs.response) {
           const hp = this.hands[mySeat];
-          actions = { kind: "call", ron: !hp.called, tile: this.lastDiscard!.tile, fromSeat: this.lastDiscard!.seat, canPon: cs.canPon, canKan: cs.canKan };
+          const furiten = this.furitenReason(mySeat, this.lastDiscard!.tile.ch);
+          actions = { kind: "call", ron: !hp.called && !furiten, tile: this.lastDiscard!.tile, fromSeat: this.lastDiscard!.seat, canPon: cs.canPon, canKan: cs.canKan, furiten };
           deadline = this.windowDeadline;
         }
       } else if (this.step === "claim") {

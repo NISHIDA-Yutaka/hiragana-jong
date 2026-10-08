@@ -1,6 +1,6 @@
 // 対局画面
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { handEndSeq, type CallOption, type GameEvent, type GameView } from "../../shared/protocol";
+import { handEndSeq, type CallOption, type FuritenReason, type GameEvent, type GameView } from "../../shared/protocol";
 import { emit, lsGet, lsSet, send, toast, useStore } from "../net";
 import { callSound, chime, clack, prefs, riichiSound, riipaiStart, say, setPref, shuffle, tick } from "../sound";
 import { ChatFlow } from "./ChatFlow";
@@ -46,6 +46,13 @@ const CALL_TEXT: Partial<Record<GameEvent["type"], string>> = {
   ryuukyoku: "流局",
   abort: "流局",
   chombo: "チョンボ",
+};
+
+/** フリテンの理由（その文字ではロンできない） */
+const FURITEN_TEXT: Record<FuritenReason, (ch: string) => string> = {
+  discard: (ch) => `「${ch}」を捨てています`,
+  missed: (ch) => `「${ch}」を見逃したばかりです（次のツモまで）`,
+  riichi: (ch) => `リーチ後に「${ch}」を見逃しています`,
 };
 
 async function act(a: object) {
@@ -427,6 +434,11 @@ export function Table() {
                       </i>
                     )}
                   </span>
+                  {callA.furiten && (
+                    <span className="furiten-warn" title="この文字ではロンできません（ツモはできます）">
+                      フリテン：{FURITEN_TEXT[callA.furiten](callA.tile.ch)}
+                    </span>
+                  )}
                   <button className="abtn abtn-ron" disabled={!callA.ron} onClick={() => act({ type: "call", call: "ron" })}>
                     ロン
                   </button>

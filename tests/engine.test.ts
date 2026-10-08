@@ -305,7 +305,7 @@ describe("自己申告", () => {
     expect(game.viewFor("a").result?.kind).toBe("chombo");
   });
 
-  it("フリテンのロンは確認なしでチョンボ", () => {
+  it("フリテンのロンは押せない（警告を出し、チョンボにはしない）", () => {
     const { game } = makeGame(rigWall("ららいぬそやまかはないすそ", "ねこさくくるまたぬききつね", "とら"));
     game.act("a", { type: "discard", tileId: game.viewFor("a").myHand.find((t) => t.ch === "そ")!.id });
     game.act("b", { type: "call", call: "pass" });
@@ -313,11 +313,12 @@ describe("自己申告", () => {
     game.act("b", { type: "discard", tileId: game.viewFor("b").drawnId! });
     game.act("a", { type: "call", call: "pass" });
     game.act("a", { type: "discard", tileId: game.viewFor("a").myHand.find((t) => t.ch === "ら")!.id });
-    game.act("b", { type: "call", call: "ron" });
-    game.act("b", { type: "ronPlace", group: 4, pos: 2 });
-    const r = game.viewFor("a").result!;
-    expect(r.kind).toBe("chombo");
-    expect(r.note).toContain("フリテン");
+    const v = game.viewFor("b");
+    if (v.actions?.kind !== "call") throw new Error("not call");
+    expect(v.actions.furiten).toBe("discard");
+    expect(v.actions.ron).toBe(false);
+    expect(game.act("b", { type: "call", call: "ron" })).toContain("フリテン");
+    expect(game.viewFor("a").result).toBeNull();
   });
 
   it("フリテンは同じ文字だけ：別の待ちの文字を捨てていてもロンできる", () => {
