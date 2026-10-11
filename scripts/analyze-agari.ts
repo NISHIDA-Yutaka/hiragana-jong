@@ -1,5 +1,5 @@
 // アガリの記録を読み、同じ14牌を辞書で並べ直したら作れた役と、実際に付けた役を比べる
-// 使い方: npx tsx scripts/analyze-agari.ts [ログ=logs/agari.jsonl] [--who human|bot|all] [--dict full|common] [--misses 件数]
+// 使い方: pnpm tsx scripts/analyze-agari.ts [ログ=logs/agari.jsonl] [--who human|bot|all] [--dict full|common] [--misses 件数]
 import { readFileSync } from "fs";
 import { getBaseLexicon } from "../src/server/dict";
 import type { DictConfig, Lexicon } from "../src/shared/lexicon";

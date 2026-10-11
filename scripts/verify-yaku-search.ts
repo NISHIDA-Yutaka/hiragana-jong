@@ -1,5 +1,5 @@
 // 作れる役の判定（役ごとの直接探索）が、全通りの役計算と一致するか確かめる
-// 使い方: npx tsx scripts/verify-yaku-search.ts [手の数=60] [extra]（extra で濁音など＋30牌あり）
+// 使い方: pnpm tsx scripts/verify-yaku-search.ts [手の数=60] [extra]（extra で濁音など＋30牌あり）
 import { getBaseLexicon, getWordList } from "../src/server/dict";
 import { countsOf, enumerateChiitoi, enumerateStandard } from "../src/shared/analysis";
 import { buildTileChars } from "../src/shared/tiles";

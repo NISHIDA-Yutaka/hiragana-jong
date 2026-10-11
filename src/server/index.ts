@@ -316,5 +316,5 @@ getWordList();
 getBaseLexicon({ level: "full", seion: false, extraTiles: false });
 
 http.listen(PORT, () => {
-  console.log(`ひらがじゃん server listening on http://localhost:${PORT}${publicDir ? "" : " (client: run `npm run dev:client`)"}`);
+  console.log(`ひらがじゃん server listening on http://localhost:${PORT}${publicDir ? "" : " (client: run `pnpm dev:client`)"}`);
 });

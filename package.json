@@ -5,7 +5,7 @@
   "type": "module",
   "description": "ひらがじゃん オンライン — ひらがな牌で遊ぶ麻雀風ことばゲーム",
   "scripts": {
-    "dev": "concurrently -k -n server,client -c blue,green \"npm:dev:server\" \"npm:dev:client\"",
+    "dev": "concurrently -k -n server,client -c blue,green \"pnpm:dev:server\" \"pnpm:dev:client\"",
     "dev:server": "tsx watch src/server/index.ts --port 3001",
     "dev:client": "vite",
     "build": "vite build && esbuild src/server/index.ts --bundle --platform=node --format=esm --packages=external --outfile=dist/server.js",
@@ -15,8 +15,9 @@
     "sim": "tsx scripts/simulate.ts"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22.13"
   },
+  "packageManager": "pnpm@11.28.2",
   "dependencies": {
     "express": "^5.2.1",
     "react": "^19.3.0",

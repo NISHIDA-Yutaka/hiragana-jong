@@ -1,5 +1,5 @@
 // ボット同士で対局をシミュレーションして、エンジンの不具合や役のバランスを確かめる
-// 使い方: npx tsx scripts/simulate.ts [対局数] [weak|normal|strong] [tonpuu|hanchan|ikkyoku] [人数]
+// 使い方: pnpm tsx scripts/simulate.ts [対局数] [weak|normal|strong] [tonpuu|hanchan|ikkyoku] [人数]
 // RECORD=ファイル名 をつけると、アガリをログと同じ形式（JSON Lines）で書き出す（analyze-agari.ts で分析できる）
 import { appendFileSync, writeFileSync } from "fs";
 import { Game } from "../src/server/game";

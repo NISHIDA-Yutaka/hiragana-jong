@@ -7,7 +7,7 @@
 //  - カンする語の選び方は、山の並びを知っている前提で一番よいものを選ぶ（＝上限の見積もり）
 //  - 語は辞書（広い／常用語のみ）にあるものだけ。役は三槓子（カン3つ）で必ず付く
 //
-// 使い方：npx tsx scripts/sim-kan-chain.ts [試行回数]（追加牌ありは EXTRA=1）
+// 使い方：pnpm tsx scripts/sim-kan-chain.ts [試行回数]（追加牌ありは EXTRA=1）
 import { canStandard } from "../src/shared/analysis";
 import { kindsOfWord } from "../src/shared/lexicon";
 import { NUM_KINDS, tileSupply } from "../src/shared/tiles";
