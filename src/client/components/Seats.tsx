@@ -1,4 +1,6 @@
 // 卓の各席：捨て牌・相手の手牌・鳴いた語・中央の情報
+import { useState, type MouseEvent as ReactMouseEvent } from "react";
+import { createPortal } from "react-dom";
 import type { GameView, MeldView, SeatView } from "../../shared/protocol";
 import { WIND_NAMES } from "../../shared/tiles";
 import { Tile, TileBox, TileSize } from "./Tile";
@@ -13,10 +15,42 @@ export function posFor(seat: number, mySeat: number, n: number): Pos {
   return (["bottom", "top"] as Pos[])[r];
 }
 
-export function Meld({ m, size = "sm", glyph = 0 }: { m: MeldView; size?: TileSize; glyph?: number }) {
-  const label = { pon: "ポン", minkan: "カン", ankan: "暗カン", kakan: "加カン" }[m.type];
+const MELD_LABEL: Record<MeldView["type"], string> = { pon: "ポン", minkan: "カン", ankan: "暗カン", kakan: "加カン" };
+
+/**
+ * 鳴いた語。peek のときはカンにマウスを乗せると、大きな牌で正立させた中身を出す。
+ * 相手の席は卓ごと回して倒しているので、ポップアップは body 直下に置いて画面の向きのまま描く
+ */
+export function Meld({ m, size = "sm", glyph = 0, peek = false }: { m: MeldView; size?: TileSize; glyph?: number; peek?: boolean }) {
+  const label = MELD_LABEL[m.type];
+  const [at, setAt] = useState<{ x: number; y: number; below: boolean } | null>(null);
+  const canPeek = peek && m.type !== "pon";
+  const show = (e: ReactMouseEvent<HTMLDivElement>) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    // 画面の端で切れないよう、ポップアップの幅（md の牌40px×枚数＋余白）を見込んで寄せる
+    const half = (m.tiles.length * 40 + 28) / 2;
+    const x = Math.min(Math.max(r.left + r.width / 2, half + 8), window.innerWidth - half - 8);
+    const below = r.top < 110;
+    setAt({ x, y: below ? r.bottom : r.top, below });
+  };
   return (
-    <div className={`meld meld-${m.type}`}>
+    <div
+      className={`meld meld-${m.type} ${canPeek ? "meld-peekable" : ""}`}
+      onMouseEnter={canPeek ? show : undefined}
+      onMouseLeave={canPeek ? () => setAt(null) : undefined}
+    >
+      {at &&
+        createPortal(
+          <div className={`meld-peek ${at.below ? "meld-peek-below" : ""}`} style={{ left: at.x, top: at.y }}>
+            <div className="meld-peek-label">{label}</div>
+            <div className="meld-peek-tiles">
+              {m.tiles.map((t) => (
+                <Tile key={t.id} ch={t.ch} size="md" className={t.id === m.calledId ? "called-in" : ""} />
+              ))}
+            </div>
+          </div>,
+          document.body,
+        )}
       <div className="meld-tiles">
         {m.tiles.map((t) => (
           <Tile key={t.id} ch={t.ch} size={size} glyphRotate={glyph} className={t.id === m.calledId ? "called-in" : ""} />
@@ -96,7 +130,7 @@ export function SeatZone({ n, s, pos, isMe, lastDiscardId, isTurn }: { n: number
           )}
           <div className="opp-melds">
             {s.melds.map((m, i) => (
-              <Meld key={i} m={m} size="xs" glyph={g} />
+              <Meld key={i} m={m} size="xs" glyph={g} peek />
             ))}
           </div>
         </div>
