@@ -1,8 +1,11 @@
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
 import { Home } from "./components/Home";
 import { Lobby } from "./components/Lobby";
 import { Table } from "./components/Table";
 import { useStore } from "./net";
+
+// デバッグコンソール（部屋に入ったときだけ読み込む）。コマンドが通るかはサーバーの DEBUG_COMMANDS で決まる
+const DebugConsole = lazy(() => import("./components/DebugConsole"));
 
 export function App() {
   const room = useStore((s) => s.room);
@@ -23,6 +26,11 @@ export function App() {
         </div>
       )}
       {!connected && <div className="conn-banner">{everConnected ? "再接続しています…" : "サーバーに接続しています…"}</div>}
+      {room && (
+        <Suspense fallback={null}>
+          <DebugConsole />
+        </Suspense>
+      )}
     </>
   );
 }

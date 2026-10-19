@@ -9,6 +9,7 @@ import type { Arrangement } from "../shared/arrange";
 import type { BotLevel, GameAction, RoomSettings } from "../shared/protocol";
 import { readAgariLog } from "./agariLog";
 import { getWordList, getBaseLexicon } from "./dict";
+import { debugCommand, DEBUG_ENABLED } from "./debug";
 import { Member, Room } from "./room";
 
 const portArg = process.argv.indexOf("--port");
@@ -265,6 +266,15 @@ io.on("connection", (socket) => {
     }
   });
 
+  // デバッグ用のコマンド。結果は打った本人にだけ返す（部屋の全員には送らない）
+  socket.on("debug:command", (p: { text?: string }, ack) => {
+    const reply = safeAck(ack);
+    if (!DEBUG_ENABLED) return reply({ error: "デバッグコマンドは無効です（サーバーを DEBUG_COMMANDS=1 で起動してください）" });
+    const s = ctx();
+    if (!s) return reply({ error: "部屋に入っていません" });
+    reply(debugCommand(s.room, s.member, String(p?.text ?? "")));
+  });
+
   socket.on("disconnect", () => detach(socket));
 });
 
@@ -317,4 +327,5 @@ getBaseLexicon({ level: "full", seion: false, extraTiles: false });
 
 http.listen(PORT, "127.0.0.1", () => {
   console.log(`ひらがじゃん server listening on http://127.0.0.1:${PORT}${publicDir ? "" : " (client: run `pnpm dev:client`)"}`);
+  if (DEBUG_ENABLED) console.log("デバッグコマンドが有効です（DEBUG_COMMANDS=1）");
 });

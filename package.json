@@ -6,7 +6,7 @@
   "description": "ひらがじゃん オンライン — ひらがな牌で遊ぶ麻雀風ことばゲーム",
   "scripts": {
     "dev": "concurrently -k -n server,client -c blue,green \"pnpm:dev:server\" \"pnpm:dev:client\"",
-    "dev:server": "tsx watch src/server/index.ts --port 3001",
+    "dev:server": "DEBUG_COMMANDS=1 tsx watch src/server/index.ts --port 3001",
     "dev:client": "vite",
     "build": "vite build && esbuild src/server/index.ts --bundle --platform=node --format=esm --packages=external --outfile=dist/server.js",
     "start": "node dist/server.js",

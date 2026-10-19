@@ -6,6 +6,8 @@ import { DEFAULT_SETTINGS, type RoomSettings } from "../src/shared/protocol";
 import { buildTileChars, tileSupply } from "../src/shared/tiles";
 import { computeYaku, paymentFor, type WordGroup, type YakuInput } from "../src/shared/yaku";
 import { Game } from "../src/server/game";
+import { debugCommand } from "../src/server/debug";
+import { Member, Room } from "../src/server/room";
 import { reachedFamilies, searchArrangements } from "../src/shared/yakuSearch";
 
 const WORDS = ["ねこ", "さくら", "くるま", "たぬき", "きつね", "いぬ", "そら", "やま", "かさ", "はな", "いす", "とまと", "たしか", "かした", "あい", "いなり", "うきわ", "えほん", "おかめ", "かもめ", "めだか"];
@@ -704,5 +706,95 @@ describe("重回文・同種を対局の中で確かめる", () => {
     const y = yakuOf(game);
     expect(y["同種"]).toBeUndefined();
     expect(y["重回文"]).toBe(5);
+  });
+});
+
+describe("デバッグ：配牌の指定", () => {
+  const rigGame = (rigs: Map<number, string[]>) => {
+    const game = new Game({
+      settings: { ...DEFAULT_SETTINGS, playerCount: 4, extraTiles: true, timer: "none", riipaiSeconds: 0 },
+      fast: true,
+      players: ["a", "b", "c", "d"].map((id) => ({ id, name: id.toUpperCase(), isBot: false })),
+      hooks: { update: () => {}, wordApproved: () => {}, playerLex: () => lex, theme: () => null, takeRigs: () => rigs },
+    });
+    game.start();
+    return game;
+  };
+  const chars = (game: Game, id: string) => {
+    const v = game.viewFor(id);
+    const byId = new Map(v.myHand.map((t) => [t.id, t.ch]));
+    return v.arrangement!.order.map((i) => byId.get(i)!);
+  };
+
+  it("指定した席の手牌の先頭に、語ごとに区切って配る（親・子とも）", () => {
+    for (let i = 0; i < 30; i++) {
+      const game = rigGame(
+        new Map([
+          [0, ["さくら"]],
+          [1, ["ほげ", "おばかさん"]],
+        ]),
+      );
+      expect(chars(game, "a").slice(0, 3).join("")).toBe("さくら");
+      expect(chars(game, "b").slice(0, 7).join("")).toBe("ほげおばかさん");
+      const v = game.viewFor("b");
+      const order = v.arrangement!.order;
+      expect(v.arrangement!.breaks).toEqual([order[1], order[6]]);
+      expect(v.myHand).toHaveLength(13);
+      expect(game.viewFor("a").myHand).toHaveLength(14);
+      game.destroy();
+    }
+  });
+
+  it("指定した牌は山から抜かれ、牌の総数と種類ごとの枚数は変わらない", () => {
+    for (let i = 0; i < 30; i++) {
+      // 「あ」は3枚しかないので、2人で3枚使うと他の人の手や山には残らない
+      const game = rigGame(
+        new Map([
+          [2, ["ああ"]],
+          [3, ["あい"]],
+        ]),
+      );
+      const wall = (game as unknown as { wall: { ch: string }[] }).wall.map((t) => t.ch);
+      expect([...wall].sort()).toEqual([...buildTileChars(true)].sort());
+      const others = ["a", "b"].flatMap((id) => game.viewFor(id).myHand.map((t) => t.ch));
+      expect(others).not.toContain("あ");
+      game.destroy();
+    }
+  });
+});
+
+describe("デバッグ：/set コマンド", () => {
+  const lobby = () => {
+    const room = new Room("TEST", { broadcast: () => {} });
+    const me = room.addHuman("わたし");
+    room.addHuman("もじまる");
+    return { room, me };
+  };
+  const run = (room: Room, me: Member, text: string) => debugCommand(room, me, text);
+
+  it("自分やほかの人（名前の前の方だけでも可）に予約できる", () => {
+    const { room, me } = lobby();
+    room.settings.extraTiles = true;
+    expect(run(room, me, "/set ほげ おばかさん")).not.toHaveProperty("error");
+    expect(room.debugRigs.get(me.id)).toEqual(["ほげ", "おばかさん"]);
+    expect(run(room, me, "/set @もじ ネコ")).not.toHaveProperty("error");
+    expect(room.debugRigs.get(room.members[1].id)).toEqual(["ねこ"]);
+    expect(run(room, me, "/clear @all")).not.toHaveProperty("error");
+    expect(room.debugRigs.size).toBe(0);
+  });
+
+  it("13枚を超える・山にない枚数・知らない人はエラー", () => {
+    const { room, me } = lobby();
+    expect(run(room, me, "/set あいうえおかきくけこさしすせ")).toHaveProperty("error");
+    expect(run(room, me, "/set ああ")).not.toHaveProperty("error");
+    expect(run(room, me, "/set @もじまる ああ")).toHaveProperty("error");
+    expect(run(room, me, "/set @だれか いぬ")).toHaveProperty("error");
+  });
+
+  it("追加牌なしの卓では、濁音を清音の牌にする", () => {
+    const { room, me } = lobby();
+    room.settings.extraTiles = false;
+    expect(run(room, me, "/set ほげ")).not.toHaveProperty("error");
+    expect(room.debugRigs.get(me.id)).toEqual(["ほけ"]);
   });
 });

@@ -43,6 +43,8 @@ export class Room {
   /** 観戦者が手元を見ている席（メンバーID → 席） */
   watching = new Map<string, number>();
   lastActive = Date.now();
+  /** デバッグ用：次の配牌で配る牌の予約（メンバーID → 語の並び）。部屋の状態としては誰にも送らない */
+  debugRigs = new Map<string, string[]>();
   private chatSeq = 0;
   private roomLexCache: Lexicon | null = null;
   private io: RoomIO;
@@ -311,6 +313,15 @@ export class Room {
         playerLex: (id) => this.playerLex(id),
         theme: (id) => this.member(id)?.theme ?? null,
         record: (rec) => appendAgari({ ...rec, room: this.code }),
+        takeRigs: () => {
+          const out = new Map<number, string[]>();
+          for (const [id, words] of this.debugRigs) {
+            const seat = this.seatedIds.indexOf(id);
+            if (seat >= 0) out.set(seat, words);
+          }
+          this.debugRigs.clear();
+          return out;
+        },
       },
     });
     for (const m of seated) if (!m.isBot && m.sockets.size === 0) this.game.setConnected(m.id, false);

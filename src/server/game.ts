@@ -118,6 +118,8 @@ export interface GameHooks {
   log?: (msg: string) => void;
   /** アガリの記録（役のバランスの検証用） */
   record?: (rec: AgariRecord) => void;
+  /** デバッグ用：次の配牌で配る牌の予約を受け取る（席 → 語の並び）。受け取った予約は消える */
+  takeRigs?: () => Map<number, string[]>;
 }
 
 const RULES = {
@@ -175,6 +177,8 @@ export class Game {
 
   /** presetWall: テスト用に最初の局の山を固定する（文字の並び） */
   private presetWall: string[] | null;
+  /** この局の配牌をデバッグで指定したか（指定した局のアガリは記録しない） */
+  private rigged = false;
 
   constructor(opts: { settings: RoomSettings; players: GamePlayerInfo[]; hooks: GameHooks; fast?: boolean; presetWall?: string[] }) {
     this.presetWall = opts.presetWall ?? null;
@@ -335,6 +339,8 @@ export class Game {
       }
     }
     this.wall = tiles;
+    const rigs = this.placeRigs(this.hooks.takeRigs?.());
+    this.rigged = rigs.size > 0;
     this.drawPos = 0;
     this.rinshanTaken = 0;
     this.noCallYet = true;
@@ -368,6 +374,7 @@ export class Game {
       }
     }
     for (const hp of this.hands) hp.arr = reconcile(null, hp.hand);
+    for (const [seat, groups] of rigs) this.hands[seat].arr = rigArrangement(groups, this.hands[seat].hand);
     this.emit("start", this.dealer, `${WIND_NAMES[this.roundWind]}${this.kyoku + 1}局`);
     this.log(`=== ${WIND_NAMES[this.roundWind]}${this.kyoku + 1}局 ${this.honba}本場 ===`);
     // 親は先に14枚目をツモっておき、全員で理牌してから始める（天和の可能性を残す）
@@ -387,6 +394,38 @@ export class Game {
       return;
     }
     this.beginTurn(this.dealer, "dealt");
+  }
+
+  /**
+   * デバッグ用：予約された牌を、その席が配牌で受け取る山の位置へ入れ替えて置く。
+   * 入れ替える相手は山の中の同じ文字からランダムに選ぶので、山から抜いた分は自然に引いた場合と同じく全体に散らばる。
+   * 戻り値は席ごとの、語ごとに分けた牌ID
+   */
+  private placeRigs(rigs: Map<number, string[]> | undefined): Map<number, number[][]> {
+    const out = new Map<number, number[][]>();
+    if (!rigs) return out;
+    const placed = new Set<number>();
+    for (const [seat, words] of rigs) {
+      const k = (seat - this.dealer + this.n) % this.n;
+      const groups: number[][] = [];
+      let r = 0;
+      for (const word of words) {
+        const ids: number[] = [];
+        for (const ch of word) {
+          if (r >= 13) break;
+          const pos = r++ * this.n + k;
+          const from = this.wall.map((t, i) => (t.ch === ch && !placed.has(i) ? i : -1)).filter((i) => i >= 0);
+          if (from.length === 0) continue; // 予約のあとで追加牌の設定が変わったなど
+          const j = from[Math.floor(Math.random() * from.length)];
+          [this.wall[pos], this.wall[j]] = [this.wall[j], this.wall[pos]];
+          placed.add(pos);
+          ids.push(this.wall[pos].id);
+        }
+        if (ids.length) groups.push(ids);
+      }
+      if (groups.length) out.set(seat, groups);
+    }
+    return out;
   }
 
   private endRiipai() {
@@ -1190,7 +1229,7 @@ export class Game {
   }
 
   private recordAgari(claim: Claim, yaku: YakuResult, groups: { word: string; meld: MeldType | null }[]) {
-    if (!this.hooks.record) return;
+    if (!this.hooks.record || this.rigged) return;
     const s = claim.seat;
     const hp = this.hands[s];
     const p = this.players[s];
@@ -1768,4 +1807,13 @@ function shapeError(groups: { word: string }[], meldCount: number, chiitoi: bool
     }
   }
   return `アガリの形（2文字×1＋3文字×4、または異なる2文字×7）${tail}`;
+}
+
+/** デバッグで指定した牌を、語ごとに区切って手牌の先頭に並べる。残りの牌はその後ろに1つの組で置く */
+function rigArrangement(groups: number[][], hand: Tile[]): Arrangement {
+  const head = groups.flat();
+  const rest = hand.map((t) => t.id).filter((id) => !head.includes(id));
+  const order = [...head, ...rest];
+  const breaks = groups.map((g) => g[g.length - 1]).filter((id) => id !== order[order.length - 1]);
+  return { order, breaks };
 }
