@@ -315,6 +315,6 @@ if (publicDir) {
 getWordList();
 getBaseLexicon({ level: "full", seion: false, extraTiles: false });
 
-http.listen(PORT, () => {
-  console.log(`ひらがじゃん server listening on http://localhost:${PORT}${publicDir ? "" : " (client: run `pnpm dev:client`)"}`);
+http.listen(PORT, "127.0.0.1", () => {
+  console.log(`ひらがじゃん server listening on http://127.0.0.1:${PORT}${publicDir ? "" : " (client: run `pnpm dev:client`)"}`);
 });
