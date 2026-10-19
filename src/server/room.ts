@@ -8,7 +8,7 @@ import { normalizeInput, tileSupply, toSeion } from "../shared/tiles";
 import { THEMES } from "../shared/yaku";
 import { getBaseLexicon, getBotLexicon } from "./dict";
 import { appendAgari } from "./agariLog";
-import { Game } from "./game";
+import { DealRig, Game } from "./game";
 
 export interface Member {
   id: string;
@@ -43,8 +43,8 @@ export class Room {
   /** 観戦者が手元を見ている席（メンバーID → 席） */
   watching = new Map<string, number>();
   lastActive = Date.now();
-  /** デバッグ用：次の配牌で配る牌の予約（メンバーID → 語の並び）。部屋の状態としては誰にも送らない */
-  debugRigs = new Map<string, string[]>();
+  /** デバッグ用：次の配牌で配る牌の予約（メンバーID → 予約）。部屋の状態としては誰にも送らない */
+  debugRigs = new Map<string, DealRig>();
   private chatSeq = 0;
   private roomLexCache: Lexicon | null = null;
   private io: RoomIO;
@@ -314,10 +314,10 @@ export class Room {
         theme: (id) => this.member(id)?.theme ?? null,
         record: (rec) => appendAgari({ ...rec, room: this.code }),
         takeRigs: () => {
-          const out = new Map<number, string[]>();
-          for (const [id, words] of this.debugRigs) {
+          const out = new Map<number, DealRig>();
+          for (const [id, rig] of this.debugRigs) {
             const seat = this.seatedIds.indexOf(id);
-            if (seat >= 0) out.set(seat, words);
+            if (seat >= 0) out.set(seat, rig);
           }
           this.debugRigs.clear();
           return out;

@@ -118,8 +118,14 @@ export interface GameHooks {
   log?: (msg: string) => void;
   /** アガリの記録（役のバランスの検証用） */
   record?: (rec: AgariRecord) => void;
-  /** デバッグ用：次の配牌で配る牌の予約を受け取る（席 → 語の並び）。受け取った予約は消える */
-  takeRigs?: () => Map<number, string[]>;
+  /** デバッグ用：次の配牌で配る牌の予約を受け取る（席 → 予約）。受け取った予約は消える */
+  takeRigs?: () => Map<number, DealRig>;
+}
+
+/** デバッグ用の配牌の予約。random のときは、語ごとにまとめたまま手牌のランダムな位置に入れる */
+export interface DealRig {
+  words: string[];
+  random: boolean;
 }
 
 const RULES = {
@@ -374,7 +380,7 @@ export class Game {
       }
     }
     for (const hp of this.hands) hp.arr = reconcile(null, hp.hand);
-    for (const [seat, groups] of rigs) this.hands[seat].arr = rigArrangement(groups, this.hands[seat].hand);
+    for (const [seat, r] of rigs) this.hands[seat].arr = rigArrangement(r.groups, r.random, this.hands[seat].hand);
     this.emit("start", this.dealer, `${WIND_NAMES[this.roundWind]}${this.kyoku + 1}局`);
     this.log(`=== ${WIND_NAMES[this.roundWind]}${this.kyoku + 1}局 ${this.honba}本場 ===`);
     // 親は先に14枚目をツモっておき、全員で理牌してから始める（天和の可能性を残す）
@@ -401,11 +407,11 @@ export class Game {
    * 入れ替える相手は山の中の同じ文字からランダムに選ぶので、山から抜いた分は自然に引いた場合と同じく全体に散らばる。
    * 戻り値は席ごとの、語ごとに分けた牌ID
    */
-  private placeRigs(rigs: Map<number, string[]> | undefined): Map<number, number[][]> {
-    const out = new Map<number, number[][]>();
+  private placeRigs(rigs: Map<number, DealRig> | undefined): Map<number, { groups: number[][]; random: boolean }> {
+    const out = new Map<number, { groups: number[][]; random: boolean }>();
     if (!rigs) return out;
     const placed = new Set<number>();
-    for (const [seat, words] of rigs) {
+    for (const [seat, { words, random }] of rigs) {
       const k = (seat - this.dealer + this.n) % this.n;
       const groups: number[][] = [];
       let r = 0;
@@ -423,7 +429,7 @@ export class Game {
         }
         if (ids.length) groups.push(ids);
       }
-      if (groups.length) out.set(seat, groups);
+      if (groups.length) out.set(seat, { groups, random });
     }
     return out;
   }
@@ -1809,11 +1815,20 @@ function shapeError(groups: { word: string }[], meldCount: number, chiitoi: bool
   return `アガリの形（2文字×1＋3文字×4、または異なる2文字×7）${tail}`;
 }
 
-/** デバッグで指定した牌を、語ごとに区切って手牌の先頭に並べる。残りの牌はその後ろに1つの組で置く */
-function rigArrangement(groups: number[][], hand: Tile[]): Arrangement {
-  const head = groups.flat();
-  const rest = hand.map((t) => t.id).filter((id) => !head.includes(id));
-  const order = [...head, ...rest];
-  const breaks = groups.map((g) => g[g.length - 1]).filter((id) => id !== order[order.length - 1]);
-  return { order, breaks };
+/**
+ * デバッグで指定した牌の並び（区切りは付けない）。ふだんは手牌の先頭に指定の順で並べ、残りの牌をその後ろに置く。
+ * random のときは、語ごとにまとめたまま、残りの牌の間のランダムな位置に語の順番を保って入れる
+ */
+function rigArrangement(groups: number[][], random: boolean, hand: Tile[]): Arrangement {
+  const all = new Set(groups.flat());
+  const rest = hand.map((t) => t.id).filter((id) => !all.has(id));
+  if (!random) return { order: [...all, ...rest], breaks: [] };
+  const gaps = groups.map(() => Math.floor(Math.random() * (rest.length + 1))).sort((a, b) => a - b);
+  const order: number[] = [];
+  let gi = 0;
+  for (let i = 0; i <= rest.length; i++) {
+    while (gi < groups.length && gaps[gi] === i) order.push(...groups[gi++]);
+    if (i < rest.length) order.push(rest[i]);
+  }
+  return { order, breaks: [] };
 }
