@@ -950,6 +950,15 @@ fieldset:disabled .seg button:not(.on) {
   color: var(--gold);
   letter-spacing: 0.05em;
 }
+.cb-alllast {
+  padding: 0 8px;
+  border-radius: 999px;
+  background: #b8321f;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+}
 .cb-sub {
   display: flex;
   gap: 10px;
@@ -1859,6 +1868,16 @@ fieldset:disabled .seg button:not(.on) {
     0 0 26px rgba(255, 200, 60, 1),
     0 6px 0 rgba(0, 0, 0, 0.4);
 }
+.callout-allLast {
+  animation-duration: 2.6s;
+}
+.callout-allLast .co-text {
+  font-size: 92px;
+  -webkit-text-stroke-color: #9e1d10;
+  text-shadow:
+    0 0 28px rgba(255, 200, 60, 1),
+    0 6px 0 rgba(0, 0, 0, 0.4);
+}
 .callout-kan .co-text,
 .callout-ankan .co-text,
 .callout-kakan .co-text {
@@ -2304,6 +2323,11 @@ fieldset:disabled .seg button:not(.on) {
   cursor: default;
   animation: none;
   transform: none;
+}
+.ab-left {
+  margin-left: 8px;
+  color: var(--gold);
+  font-variant-numeric: tabular-nums;
 }
 .abtn-quiet {
   animation: btn-pop 0.25s cubic-bezier(0.2, 1.6, 0.4, 1);

@@ -43,6 +43,9 @@ export const DEFAULT_SETTINGS: RoomSettings = {
   riipaiSeconds: 180,
 };
 
+/** ロン・ポン・カンを宣言したまま手牌を並べ直すとき、残りの持ち時間をこの秒数にする（1回の宣言につき1回） */
+export const ARRANGE_SECONDS = 60;
+
 export const TIMER_SECONDS: Record<TimerPreset, { base: number; bank: number }> = {
   fast: { base: 10, bank: 30 },
   normal: { base: 20, bank: 60 },
@@ -164,12 +167,16 @@ export type ActionsView =
       /** 自己申告のロン：ロン牌をどの語のどこに入れるか選ぶ */
       kind: "ronPlace";
       tile: Tile;
+      /** 並べ直すために持ち時間を延ばしたか */
+      extended: boolean;
     }
   | {
       /** 自己申告のポン・カン：使う牌と語を選ぶ */
       kind: "callDetail";
       call: "pon" | "kan";
       tile: Tile;
+      /** 並べ直すために持ち時間を延ばしたか */
+      extended: boolean;
     };
 
 export interface VoteItem {
@@ -250,6 +257,8 @@ export interface GameView {
   seats: SeatView[];
   roundWind: number;
   kyoku: number;
+  /** オーラス（最後の親の局。本場も含む） */
+  allLast: boolean;
   honba: number;
   kyotaku: number;
   dealer: number;
@@ -290,6 +299,8 @@ export type GameAction =
   | { type: "call"; call: "ron" | "pon" | "kan" | "pass" }
   | { type: "ronPlace"; group: number; pos: number }
   | { type: "ronCancel" }
+  /** ロン・ポン・カンの宣言中に手牌を並べ直すので、持ち時間を延ばす（1回の宣言につき1回） */
+  | { type: "arrangeTime" }
   | { type: "callDetail"; tileIds?: number[]; cancel?: boolean }
   | { type: "vote"; votes: Record<number, boolean> }
   | { type: "ready" }

@@ -101,6 +101,11 @@ export function Hand({ hand, serverArr, drawnId, discardable, highlight, oneClic
     commit({ order: cur.order, breaks: cur.order.slice(0, -1) });
   };
 
+  /** 区切りを全部なくして1列にする（作文で文章に並べるとき） */
+  const joinAll = () => {
+    commit({ order: cur.order, breaks: [] });
+  };
+
   /** 入力した語の牌を集めて、左から順に1つの組にする */
   const gather = (e: FormEvent) => {
     e.preventDefault();
@@ -319,6 +324,9 @@ export function Hand({ hand, serverArr, drawnId, discardable, highlight, oneClic
             </form>
             <button className="btn btn-xs btn-ghost" onClick={splitAll} title="全ての牌を1枚ずつに区切る">
               全部区切る
+            </button>
+            <button className="btn btn-xs btn-ghost" onClick={joinAll} title="区切りを全部なくして1列にする（作文で文章に並べるとき）">
+              全部つなげる
             </button>
             <button className="btn btn-xs btn-ghost" onClick={resetSort} title="五十音順に並べ直す（区切りも消えます）">
               リセット

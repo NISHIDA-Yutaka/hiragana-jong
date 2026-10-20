@@ -18,7 +18,7 @@ import type {
   VoteItem,
   WinView,
 } from "../shared/protocol";
-import { TIMER_SECONDS } from "../shared/protocol";
+import { ARRANGE_SECONDS, TIMER_SECONDS } from "../shared/protocol";
 import { buildTileChars, KINDS, NUM_KINDS, Tile, WIND_NAMES } from "../shared/tiles";
 import { computeYaku, paymentFor, YakuInput, YakuResult } from "../shared/yaku";
 import { BotBrain } from "./bot";
@@ -91,6 +91,8 @@ interface PendingRon {
   sentence?: Sentence;
   startedAt: number;
   cancelled: boolean;
+  /** 並べ直すために持ち時間を延ばしたか（1回まで） */
+  extended: boolean;
 }
 
 /** 作文：文章と牌の並び */
@@ -128,6 +130,11 @@ export interface DealRig {
   random: boolean;
 }
 
+/** ロン牌を入れる場所を選ぶ時間・ポンやカンの語を選ぶ時間 */
+const RON_PLACE_MS = 30000;
+const CALL_DETAIL_MS = 20000;
+const ARRANGE_MS = ARRANGE_SECONDS * 1000;
+
 const RULES = {
   4: { start: 22, ret: 27, uma: [15, 5, -5, -15], oka: 20 },
   3: { start: 29, ret: 34, uma: [15, 0, -15], oka: 15 },
@@ -160,7 +167,9 @@ export class Game {
   /** 自己申告のロン宣言（ロン牌を入れる位置を選んでいる） */
   private pendingRon: PendingRon[] = [];
   /** 自己申告のポン・カン（語を選んでいる） */
-  private callDetail: { seat: number; call: "pon" | "kan"; startedAt: number } | null = null;
+  private callDetail: { seat: number; call: "pon" | "kan"; deadline: number; extended: boolean } | null = null;
+  /** ロン牌を入れる場所を選ぶ締め切り（同時にロンした人で共通） */
+  private placeDeadline = 0;
   private windowDeadline: number | null = null;
   private afterCall = false;
   private noCallYet = true;
@@ -793,8 +802,8 @@ export class Game {
     if (c) {
       this.calls.clear();
       this.step = "claim";
-      this.callDetail = { seat: c.seat, call: c.response!.call as "pon" | "kan", startedAt: Date.now() };
-      this.setTimer("detail", this.fast ? 0 : 20000, () => this.resolveCallDetail(c.seat, null));
+      this.callDetail = { seat: c.seat, call: c.response!.call as "pon" | "kan", deadline: Date.now() + CALL_DETAIL_MS, extended: false };
+      this.setTimer("detail", this.fast ? 0 : CALL_DETAIL_MS, () => this.resolveCallDetail(c.seat, null));
       return;
     }
     this.finalizeDiscard();
@@ -836,17 +845,49 @@ export class Game {
     this.calls.clear();
     this.step = "claim";
     const now = Date.now();
-    this.pendingRon = seats.map((seat) => ({ seat, comp: null, startedAt: now, cancelled: false }));
+    this.pendingRon = seats.map((seat) => ({ seat, comp: null, startedAt: now, cancelled: false, extended: false }));
+    this.placeDeadline = now + RON_PLACE_MS;
     for (const s of seats) this.emit("ron", s);
     for (const pr of this.pendingRon) {
       if (this.players[pr.seat].isBot && botComp.get(pr.seat)) pr.comp = botComp.get(pr.seat)!;
       else if (this.players[pr.seat].isBot || !this.players[pr.seat].connected) this.autoPlace(pr);
     }
-    this.setTimer("place", this.fast ? 0 : 30000, () => {
-      for (const pr of this.pendingRon) if (!this.ronPlaced(pr)) this.autoPlace(pr);
-      this.judgeRons();
-    });
+    this.setTimer("place", this.fast ? 0 : RON_PLACE_MS, () => this.placeTimeout());
     if (this.pendingRon.every((p) => this.ronPlaced(p) || p.cancelled)) this.judgeRons();
+  }
+
+  /** 時間切れ：まだ選んでいない人は自動で入れる */
+  private placeTimeout() {
+    for (const pr of this.pendingRon) if (!this.ronPlaced(pr)) this.autoPlace(pr);
+    this.judgeRons();
+  }
+
+  /**
+   * ロン・ポン・カンを宣言したまま手牌を並べ直すとき、持ち時間を延ばす（残りを ARRANGE_MS に。1回の宣言につき1回）。
+   * 2回目以降は何もしない（並べ直すこと自体はいつでもできる）
+   */
+  private extendArrange(seat: number): string | null {
+    if (this.step !== "claim") return "宣言中ではありません";
+    const now = Date.now();
+    const pr = this.pendingRon.find((p) => p.seat === seat && !this.ronPlaced(p));
+    const cd = this.callDetail?.seat === seat ? this.callDetail : null;
+    if (pr) {
+      if (pr.extended) return null;
+      pr.extended = true;
+      if (now + ARRANGE_MS > this.placeDeadline) {
+        this.placeDeadline = now + ARRANGE_MS;
+        this.setTimer("place", this.fast ? 0 : ARRANGE_MS, () => this.placeTimeout());
+      }
+      return null;
+    }
+    if (cd) {
+      if (cd.extended) return null;
+      cd.extended = true;
+      cd.deadline = Math.max(cd.deadline, now + ARRANGE_MS);
+      this.setTimer("detail", this.fast ? 0 : cd.deadline - now, () => this.resolveCallDetail(seat, null));
+      return null;
+    }
+    return "宣言中ではありません";
   }
 
   private ronPlaced(pr: { comp: Completed | null; sentence?: Sentence; cancelled: boolean }) {
@@ -1455,6 +1496,15 @@ export class Game {
     f();
   }
 
+  /**
+   * オーラス：予定の最後の場（東風戦は東、半荘戦は南）とその延長の、最後の親の局。親が続く間（本場）もオーラス。
+   * 1局勝負は最初から最後の局なので、オーラスとは呼ばない
+   */
+  private get isAllLast() {
+    const lastWind = this.settings.length === "hanchan" ? 1 : 0;
+    return this.settings.length !== "ikkyoku" && this.kyoku === this.n - 1 && this.roundWind >= lastWind;
+  }
+
   /** 次の局へ。renchan=親が続く */
   private advance(mode: "renchan" | "rotate", honba: number) {
     const lastWind = this.settings.length === "hanchan" ? 1 : 0;
@@ -1462,7 +1512,7 @@ export class Game {
     const top = Math.max(...this.players.map((p) => p.score));
     if (this.settings.length === "ikkyoku") return this.endGame();
     if (this.players.some((p) => p.score < 0)) return this.endGame();
-    const isLastKyoku = this.kyoku === this.n - 1 && this.roundWind >= lastWind;
+    const isLastKyoku = this.isAllLast;
     const inExtension = this.roundWind > lastWind;
     if (inExtension && top >= ret) return this.endGame();
     if (mode === "renchan") {
@@ -1635,6 +1685,9 @@ export class Game {
       case "ronCancel":
         err = this.cancelRon(seat);
         break;
+      case "arrangeTime":
+        err = this.extendArrange(seat);
+        break;
       case "callDetail":
         err = this.resolveCallDetail(seat, a.cancel ? null : (a.tileIds ?? null));
         break;
@@ -1729,11 +1782,11 @@ export class Game {
       } else if (this.step === "claim") {
         const pr = this.pendingRon.find((p) => p.seat === mySeat && !this.ronPlaced(p));
         if (pr) {
-          actions = { kind: "ronPlace", tile: this.lastDiscard!.tile };
-          deadline = pr.startedAt + 30000;
+          actions = { kind: "ronPlace", tile: this.lastDiscard!.tile, extended: pr.extended };
+          deadline = this.placeDeadline;
         } else if (this.callDetail?.seat === mySeat) {
-          actions = { kind: "callDetail", call: this.callDetail.call, tile: this.lastDiscard!.tile };
-          deadline = this.callDetail.startedAt + 20000;
+          actions = { kind: "callDetail", call: this.callDetail.call, tile: this.lastDiscard!.tile, extended: this.callDetail.extended };
+          deadline = this.callDetail.deadline;
         }
       }
     }
@@ -1767,6 +1820,7 @@ export class Game {
       seats,
       roundWind: this.roundWind,
       kyoku: this.kyoku,
+      allLast: this.isAllLast,
       honba: this.honba,
       kyotaku: this.kyotaku,
       dealer: this.dealer,

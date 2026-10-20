@@ -143,6 +143,7 @@ export function CenterBox({ g, mySeat }: { g: GameView; mySeat: number }) {
   return (
     <div className="center-box">
       <div className="cb-inner">
+        {g.allLast && <div className="cb-alllast">オーラス</div>}
         <div className="cb-round">
           {WIND_NAMES[g.roundWind]}
           {g.kyoku + 1}局

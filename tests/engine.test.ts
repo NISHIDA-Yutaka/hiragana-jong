@@ -340,6 +340,32 @@ describe("自己申告", () => {
     expect(game.viewFor("a").result?.kind).toBe("agari");
   });
 
+  it("ポンを宣言したあとでも手牌を並べ直せて、並べ直すと持ち時間が1回だけ延びる", () => {
+    const { game } = makeGame(rigWall("ららいぬそやまかはないすそ", "ねこさくくるまたぬききつと", "と"));
+    // 「さく」の組がないままポンする
+    arrangeAs(game, "b", ["ねこ", "くるま", "たぬき", "きつと"]);
+    const ra = game.viewFor("a").myHand.find((t) => t.ch === "ら")!;
+    game.act("a", { type: "discard", tileId: ra.id });
+    expect(game.act("b", { type: "call", call: "pon" })).toBeNull();
+    let v = game.viewFor("b");
+    expect(v.actions).toMatchObject({ kind: "callDetail", extended: false });
+    const before = v.deadline!;
+    expect(before - Date.now()).toBeLessThanOrEqual(20000);
+    expect(game.act("b", { type: "arrangeTime" })).toBeNull();
+    v = game.viewFor("b");
+    expect(v.actions).toMatchObject({ kind: "callDetail", extended: true });
+    const after = v.deadline!;
+    expect(after - Date.now()).toBeGreaterThan(55000);
+    // 2回目は延びない
+    expect(game.act("b", { type: "arrangeTime" })).toBeNull();
+    expect(game.viewFor("b").deadline).toBe(after);
+    // 宣言したまま区切り直して、語を選ぶ
+    arrangeAs(game, "b", ["さく", "ねこ", "くるま", "たぬき", "きつと"]);
+    const [sa, ku] = game.viewFor("b").arrangement!.order;
+    expect(game.act("b", { type: "callDetail", tileIds: [sa, ku, ra.id] })).toBeNull();
+    expect(game.viewFor("b").seats[1].melds[0].word).toBe("さくら");
+  });
+
   it("ポンは押してから語を選ぶ。辞書にない語でも鳴ける（アガったときに投票）", () => {
     const { game } = makeGame(rigWall("ららいぬそやまかはないすそ", "ねこさくくるまたぬききつと", "と"));
     arrangeAs(game, "b", ["さく", "ねこ", "くるま", "たぬき", "きつと"]);
@@ -504,6 +530,28 @@ describe("作文リーチ（自己申告）", () => {
     const r = game.viewFor("a").result!;
     expect(r.kind).toBe("agari");
     expect(r.wins[0].fromSeat).toBe(1);
+    expect(r.wins[0].yaku.map((y) => y.name)).toContain("作文");
+  });
+
+  it("ロンを宣言したあとでも手牌を並べ直せる（区切ったままロンしても、つなげ直して作文でアガれる）", () => {
+    const game = riichiSakubun("せ");
+    game.act("b", { type: "discard", tileId: game.viewFor("b").drawnId! });
+    expect(game.act("a", { type: "call", call: "ron" })).toBeNull();
+    // 区切った形のまま場所を選ぶ画面になった
+    const order = game.viewFor("a").arrangement!.order;
+    game.setArrangement("a", { order, breaks: [order[1], order[4]] });
+    expect(game.viewFor("a").actions?.kind).toBe("ronPlace");
+    // 画面を閉じて区切りをなくし、文章にしてから場所を選ぶ。並べ直すと持ち時間が延びる
+    expect(game.viewFor("a").deadline! - Date.now()).toBeLessThanOrEqual(30000);
+    expect(game.act("a", { type: "arrangeTime" })).toBeNull();
+    expect(game.viewFor("a").deadline! - Date.now()).toBeGreaterThan(55000);
+    expect(game.viewFor("a").actions).toMatchObject({ kind: "ronPlace", extended: true });
+    game.setArrangement("a", { order, breaks: [] });
+    expect(game.viewFor("a").actions?.kind).toBe("ronPlace");
+    expect(game.act("a", { type: "ronPlace", group: 0, pos: 12 })).toBeNull();
+    game.act("b", { type: "vote", votes: {} });
+    const r = game.viewFor("a").result!;
+    expect(r.kind).toBe("agari");
     expect(r.wins[0].yaku.map((y) => y.name)).toContain("作文");
   });
 
@@ -813,5 +861,26 @@ describe("デバッグ：/set コマンド", () => {
     room.settings.extraTiles = false;
     expect(run(room, me, "/set ほげ")).not.toHaveProperty("error");
     expect(room.debugRigs.get(me.id)).toEqual({ words: ["ほけ"], random: false });
+  });
+});
+
+describe("オーラス", () => {
+  const at = (length: RoomSettings["length"], roundWind: number, kyoku: number) => {
+    const { game } = makeGame(rigWall("ねこさくらくるまたぬききつ", "いぬそらやまかさはないすと", "ね"), { settings: { length } });
+    Object.assign(game as unknown as { roundWind: number; kyoku: number }, { roundWind, kyoku });
+    const allLast = game.viewFor("a").allLast;
+    game.destroy();
+    return allLast;
+  };
+
+  it("最後の場の最後の親の局だけがオーラス（2人打ちは2局目が最後の親）", () => {
+    expect(at("tonpuu", 0, 0)).toBe(false);
+    expect(at("tonpuu", 0, 1)).toBe(true);
+    expect(at("hanchan", 0, 1)).toBe(false);
+    expect(at("hanchan", 1, 1)).toBe(true);
+    // 延長（西入）の最後の親もオーラス
+    expect(at("tonpuu", 1, 1)).toBe(true);
+    // 1局勝負はオーラスと呼ばない
+    expect(at("ikkyoku", 0, 0)).toBe(false);
   });
 });

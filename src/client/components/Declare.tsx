@@ -38,6 +38,9 @@ export function PlaceDialog(props: {
   onConfirm: (group: number, pos: number) => void;
   cancelLabel: string;
   onCancel: () => void;
+  /** 宣言はそのままで、いったん画面を閉じて手牌を並べ直す（ロン） */
+  onArrange?: () => void;
+  arrangeLabel?: string;
   danger?: boolean;
   /** 作文：区切りのない文章に入れる（形の判定はしない） */
   sentence?: boolean;
@@ -90,6 +93,11 @@ export function PlaceDialog(props: {
           <button className={`btn ${props.danger ? "btn-danger" : "btn-ghost"}`} onClick={props.onCancel}>
             {props.cancelLabel}
           </button>
+          {props.onArrange && (
+            <button className="btn btn-ghost" onClick={props.onArrange} title="宣言は取り消さずに、手牌の区切りや並びを直してから戻ってこられます">
+              {props.arrangeLabel ?? "手牌を並べ直す"}
+            </button>
+          )}
           <button className="btn btn-primary" disabled={!ok} onClick={() => pick && props.onConfirm(pick.g, pick.p)}>
             {props.confirmLabel}
           </button>
@@ -160,7 +168,7 @@ export function TsumoDialog({
         deadline={null}
         confirmLabel="ツモを宣言"
         onConfirm={(group, pos) => onConfirm({ tile: last[0], group, pos })}
-        cancelLabel="やめる"
+        cancelLabel="やめて手牌を並べ直す"
         onCancel={onClose}
       />
     );
@@ -192,6 +200,8 @@ export function CallDetailDialog({
   deadline,
   onPick,
   onCancel,
+  onArrange,
+  arrangeLabel,
 }: {
   call: "pon" | "kan";
   tile: TileT;
@@ -199,6 +209,9 @@ export function CallDetailDialog({
   deadline: number | null;
   onPick: (tileIds: number[]) => void;
   onCancel: () => void;
+  /** 宣言はそのままで、いったん画面を閉じて手牌を並べ直す */
+  onArrange: () => void;
+  arrangeLabel: string;
 }) {
   const left = useLeft(deadline);
   const options: { word: string; ids: number[] }[] = [];
@@ -220,7 +233,7 @@ export function CallDetailDialog({
           {left !== null && <b className="declare-left">{left}</b>}
         </p>
         {options.length === 0 ? (
-          <p className="declare-lead bad">{call === "pon" ? "2枚の組がありません。手牌を区切ってください（このまま選べます）。" : "3枚以上の組がありません。"}</p>
+          <p className="declare-lead bad">{call === "pon" ? "2枚の組がありません。「手牌を並べ直す」で区切ってください。" : "3枚以上の組がありません。「手牌を並べ直す」で区切ってください。"}</p>
         ) : (
           <div className="detail-options">
             {options.map((o) => (
@@ -230,9 +243,12 @@ export function CallDetailDialog({
             ))}
           </div>
         )}
-        <div className="modal-foot">
+        <div className="modal-foot gap">
           <button className="btn btn-ghost" onClick={onCancel}>
             {label}をやめる
+          </button>
+          <button className="btn btn-ghost" onClick={onArrange} title="宣言は取り消さずに、手牌の区切りや並びを直してから戻ってこられます">
+            {arrangeLabel}
           </button>
         </div>
       </div>

@@ -1,6 +1,6 @@
 // 対局画面
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { handEndSeq, type CallOption, type GameEvent, type GameView } from "../../shared/protocol";
+import { ARRANGE_SECONDS, handEndSeq, type CallOption, type GameEvent, type GameView } from "../../shared/protocol";
 import { emit, lsGet, lsSet, send, toast, useStore } from "../net";
 import { callSound, chime, clack, prefs, riichiSound, riipaiStart, say, setPref, shuffle, tick } from "../sound";
 import { ChatFlow } from "./ChatFlow";
@@ -71,6 +71,8 @@ export function Table() {
   const kuyouOn = useKuyouPref();
   const [tsumoOpen, setTsumoOpen] = useState(false);
   const [sakuPlace, setSakuPlace] = useState(false);
+  /** ロン・ポン・カンを宣言したまま、選ぶ画面を閉じて手牌を並べ直している */
+  const [declArrange, setDeclArrange] = useState(false);
   const [, force] = useState(0);
   // 対局画面は配牌と同時に開くので、開いた時点の最後の出来事が配牌なら、その音（配牌・理牌の始まり）も鳴らす
   const [justDealt] = useState(() => g.events[g.events.length - 1]?.type === "start");
@@ -95,6 +97,16 @@ export function Table() {
         shuffle();
         // 理牌なしならそのまま対局が始まる
         if (!g.riipai) setTimeout(chime, 600);
+        if (g.allLast) {
+          // 配牌の音と重ならないよう少し遅らせ、リーチと同じ音で盛り上げる
+          setTimeout(() => {
+            riichiSound();
+            say("オーラス");
+          }, 300);
+          const key = e.seq;
+          setCallouts((c) => [...c, { key, pos: "center" as Pos, text: "オーラス", sub: e.text, kind: "allLast" }]);
+          setTimeout(() => setCallouts((c) => c.filter((x) => x.key !== key)), 2600);
+        }
       }
       const text = CALL_TEXT[e.type];
       if (text) {
@@ -159,6 +171,11 @@ export function Table() {
   }, [remain]);
 
   const actions = g.actions;
+  // 宣言中に並べ直す：選ぶ画面を閉じ、持ち時間を延ばしてもらう（延ばすのは1回の宣言につき1回）
+  const startArrange = () => {
+    setDeclArrange(true);
+    if (actions && "extended" in actions && !actions.extended) void act({ type: "arrangeTime" });
+  };
   const turnA = actions?.kind === "turn" ? actions : null;
   const callA = actions?.kind === "call" ? actions : null;
 
@@ -167,6 +184,7 @@ export function Table() {
     setChooser(null);
     setTsumoOpen(false);
     setSakuPlace(false);
+    setDeclArrange(false);
   }, [actions?.kind, g.turn, g.phase]);
 
   // 自動ツモ切り
@@ -417,6 +435,21 @@ export function Table() {
                     キャンセル
                   </button>
                 </>
+              ) : (actions?.kind === "ronPlace" || actions?.kind === "callDetail") && declArrange ? (
+                <>
+                  <span className="ab-title">
+                    <Tile ch={actions.tile.ch} size="xs" />{" "}
+                    {actions.kind === "ronPlace"
+                      ? "ロン：手牌を並べ直してください（作文は13枚を区切らずに並べる）"
+                      : actions.call === "pon"
+                        ? "ポン：手牌を並べ直してください（使う2枚を1つの組に区切る）"
+                        : "カン：手牌を並べ直してください（使う3枚以上を1つの組に区切る）"}
+                    {remain !== null && <b className="ab-left">残り{Math.ceil(remain)}秒</b>}
+                  </span>
+                  <button className={`abtn ${actions.kind === "ronPlace" ? "abtn-ron" : actions.call === "pon" ? "abtn-pon" : "abtn-kan"}`} onClick={() => setDeclArrange(false)}>
+                    {actions.kind === "ronPlace" ? "入れる場所を選ぶ" : "語を選ぶ"}
+                  </button>
+                </>
               ) : callA ? (
                 <>
                   <span className="ab-title">
@@ -567,12 +600,12 @@ export function Table() {
             setSakuPlace(false);
             void act({ type: "sakubun", pos });
           }}
-          cancelLabel="やめる"
+          cancelLabel="やめて手牌を並べ直す"
           onCancel={() => setSakuPlace(false)}
           sentence
         />
       )}
-      {actions?.kind === "ronPlace" && (
+      {actions?.kind === "ronPlace" && !declArrange && (
         <PlaceDialog
           title="ロン"
           lead={ronSentence ? "ロン牌を文章のどこに入れるか選んでください（作文）。認められないとチョンボ（満貫払い）です。" : "ロン牌を入れる場所を選んでください。認められないとチョンボ（満貫払い）です。"}
@@ -587,10 +620,12 @@ export function Table() {
           onCancel={() => {
             if (confirm("ロン宣言を取り消すとチョンボになります。取り消しますか？")) void act({ type: "ronCancel" });
           }}
+          onArrange={startArrange}
+          arrangeLabel={actions.extended ? "手牌を並べ直す" : `手牌を並べ直す（残り${ARRANGE_SECONDS}秒に延長）`}
           danger
         />
       )}
-      {actions?.kind === "callDetail" && (
+      {actions?.kind === "callDetail" && !declArrange && (
         <CallDetailDialog
           call={actions.call}
           tile={actions.tile}
@@ -598,6 +633,8 @@ export function Table() {
           deadline={g.deadline}
           onPick={(tileIds) => act({ type: "callDetail", tileIds })}
           onCancel={() => act({ type: "callDetail", cancel: true })}
+          onArrange={startArrange}
+          arrangeLabel={actions.extended ? "手牌を並べ直す" : `手牌を並べ直す（残り${ARRANGE_SECONDS}秒に延長）`}
         />
       )}
       {tsumoOpen && turnA && (
