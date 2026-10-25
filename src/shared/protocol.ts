@@ -21,6 +21,8 @@ export interface RoomSettings {
   timer: TimerPreset;
   /** ポン・カンあり */
   calls: boolean;
+  /** 四開槓：2人以上で合わせて4回カンしたら途中流局にする（なしのときは続け、5回目のカンはできない） */
+  suukaikan: boolean;
   /** 投票で否決されたとき：cancel=取り消しのみ / chombo=チョンボ（満貫払い） */
   rejectPenalty: "cancel" | "chombo";
   /** 打牌のあとロン・ポン・カンを受け付ける秒数。0=無制限（全員が応答するまで待つ） */
@@ -38,6 +40,7 @@ export const DEFAULT_SETTINGS: RoomSettings = {
   extraTiles: false,
   timer: "normal",
   calls: true,
+  suukaikan: false,
   rejectPenalty: "chombo",
   callSeconds: 12,
   riipaiSeconds: 180,

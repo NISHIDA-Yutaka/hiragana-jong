@@ -1141,7 +1141,7 @@ export class Game {
       this.abortHand("四家立直");
       return;
     }
-    if (this.totalKans() >= 4 && new Set(this.kanOwners).size >= 2) {
+    if (this.settings.suukaikan && this.totalKans() >= 4 && new Set(this.kanOwners).size >= 2) {
       this.abortHand("四開槓");
       return;
     }

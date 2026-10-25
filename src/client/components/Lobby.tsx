@@ -164,7 +164,7 @@ export function Lobby() {
               <summary>
                 その他のルール
                 <small>
-                  辞書{s.dictLevel === "full" ? "広い" : "常用語"}・鳴き{s.calls ? "あり" : "なし"}・清音代用{s.seion ? "あり" : "なし"}・七対子{s.chiitoi ? "あり" : "なし"}・否決時{s.rejectPenalty === "chombo" ? "チョンボ" : "取り消し"}
+                  辞書{s.dictLevel === "full" ? "広い" : "常用語"}・鳴き{s.calls ? "あり" : "なし"}・四開槓{s.suukaikan ? "あり" : "なし"}・清音代用{s.seion ? "あり" : "なし"}・七対子{s.chiitoi ? "あり" : "なし"}・否決時{s.rejectPenalty === "chombo" ? "チョンボ" : "取り消し"}
                 </small>
               </summary>
               <Row label="辞書">
@@ -185,6 +185,16 @@ export function Lobby() {
                     ["off", "なし"],
                   ]}
                   onChange={(v) => set({ calls: v === "on" })}
+                />
+              </Row>
+              <Row label="四開槓">
+                <Seg
+                  value={s.suukaikan ? "on" : "off"}
+                  options={[
+                    ["off", "なし（続ける）"],
+                    ["on", "あり（2人以上で4回カンしたら流局）"],
+                  ]}
+                  onChange={(v) => set({ suukaikan: v === "on" })}
                 />
               </Row>
               <Row label="清音代用">

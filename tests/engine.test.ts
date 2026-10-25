@@ -947,6 +947,48 @@ describe("デバッグ：鳴いた形で配る・鳴きたがりのCPU", () => {
   });
 });
 
+describe("四開槓", () => {
+  const kanGame = (suukaikan: boolean) => {
+    const kans = (a: string, b: string) => ({ words: [], random: false, melds: [a, b].map((word) => ({ type: "ankan" as const, word })) });
+    const rigs = new Map<number, DealRig>([
+      [1, kans("あいうえ", "かきくけ")],
+      [2, kans("さしすせ", "たちつて")],
+    ]);
+    const game = new Game({
+      settings: { ...DEFAULT_SETTINGS, playerCount: 4, extraTiles: true, timer: "none", riipaiSeconds: 0, suukaikan },
+      fast: true,
+      players: ["a", "b", "c", "d"].map((id) => ({ id, name: id.toUpperCase(), isBot: false })),
+      hooks: { update: () => {}, wordApproved: () => {}, playerLex: () => lex, theme: () => null, takeRigs: () => rigs },
+    });
+    game.start();
+    return game;
+  };
+  const afterDiscard = async (game: Game) => {
+    expect(game.act("a", { type: "discard", tileId: game.viewFor("a").myHand[0].id })).toBeNull();
+    for (let i = 0; i < 100 && game.viewFor("a").phase === "calls"; i++) await new Promise((r) => setTimeout(r, 5));
+    return game.viewFor("a");
+  };
+
+  it("ありのときは、2人以上で合わせて4回カンしたら途中流局", async () => {
+    const game = kanGame(true);
+    // 待ち時間なしのテストでは結果画面がすぐ次の局へ進むので、出来事で確かめる
+    const v = await afterDiscard(game);
+    expect(v.events.some((e) => e.type === "abort" && e.text === "四開槓")).toBe(true);
+    game.destroy();
+  });
+
+  it("なし（既定）のときは続け、5回目のカンはできない", async () => {
+    expect(DEFAULT_SETTINGS.suukaikan).toBe(false);
+    const game = kanGame(false);
+    const v = await afterDiscard(game);
+    expect(v.events.some((e) => e.type === "abort")).toBe(false);
+    expect(v.turn).toBe(1);
+    const acts = game.viewFor("b").actions;
+    expect(acts?.kind === "turn" && acts.ankan.length).toBe(0);
+    game.destroy();
+  });
+});
+
 describe("デバッグ：/meld・/naki コマンド", () => {
   const lobby = () => {
     const room = new Room("TEST", { broadcast: () => {} });
