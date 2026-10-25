@@ -1193,6 +1193,20 @@ fieldset:disabled .seg button:not(.on) {
 .meld-peekable {
   cursor: zoom-in;
 }
+/* 相手の鳴いた語は卓の布から浮かせて目立たせる */
+.opp-melds .meld {
+  padding: 3px 4px 2px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.28);
+}
+.opp-melds .meld-label {
+  font-size: 12px;
+  font-weight: 700;
+}
+.meld-peek-label b {
+  color: #fff;
+  font-size: 15px;
+}
 /* 相手のカンをマウスオーバーで大きく見せる（body 直下に置くので卓の回転・傾きを受けない） */
 .meld-peek {
   position: fixed;
