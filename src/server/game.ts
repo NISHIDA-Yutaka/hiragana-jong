@@ -223,7 +223,11 @@ export class Game {
   }
 
   get dealer() {
-    return this.kyoku;
+    return this.kyoku % this.n;
+  }
+  /** 1つの場の局数。2人打ちは親を2周させて、ほかの人数と同じく4局にする */
+  private get kyokuPerWind() {
+    return this.n === 2 ? 4 : this.n;
   }
   private get rule() {
     return RULES[this.n as 2 | 3 | 4];
@@ -1497,12 +1501,12 @@ export class Game {
   }
 
   /**
-   * オーラス：予定の最後の場（東風戦は東、半荘戦は南）とその延長の、最後の親の局。親が続く間（本場）もオーラス。
+   * オーラス：予定の最後の場（東風戦は東、半荘戦は南）とその延長の、最後の局。親が続く間（本場）もオーラス。
    * 1局勝負は最初から最後の局なので、オーラスとは呼ばない
    */
   private get isAllLast() {
     const lastWind = this.settings.length === "hanchan" ? 1 : 0;
-    return this.settings.length !== "ikkyoku" && this.kyoku === this.n - 1 && this.roundWind >= lastWind;
+    return this.settings.length !== "ikkyoku" && this.kyoku === this.kyokuPerWind - 1 && this.roundWind >= lastWind;
   }
 
   /** 次の局へ。renchan=親が続く */
@@ -1523,7 +1527,7 @@ export class Game {
     } else {
       this.honba = honba;
       this.kyoku++;
-      if (this.kyoku >= this.n) {
+      if (this.kyoku >= this.kyokuPerWind) {
         this.kyoku = 0;
         this.roundWind++;
       }

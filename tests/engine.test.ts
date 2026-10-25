@@ -873,14 +873,31 @@ describe("オーラス", () => {
     return allLast;
   };
 
-  it("最後の場の最後の親の局だけがオーラス（2人打ちは2局目が最後の親）", () => {
+  it("最後の場の最後の局だけがオーラス（2人打ちも1つの場が4局）", () => {
     expect(at("tonpuu", 0, 0)).toBe(false);
-    expect(at("tonpuu", 0, 1)).toBe(true);
-    expect(at("hanchan", 0, 1)).toBe(false);
-    expect(at("hanchan", 1, 1)).toBe(true);
-    // 延長（西入）の最後の親もオーラス
-    expect(at("tonpuu", 1, 1)).toBe(true);
+    expect(at("tonpuu", 0, 1)).toBe(false);
+    expect(at("tonpuu", 0, 3)).toBe(true);
+    expect(at("hanchan", 0, 3)).toBe(false);
+    expect(at("hanchan", 1, 3)).toBe(true);
+    // 延長（南入）の最後の局もオーラス
+    expect(at("tonpuu", 1, 3)).toBe(true);
     // 1局勝負はオーラスと呼ばない
     expect(at("ikkyoku", 0, 0)).toBe(false);
+  });
+
+  it("2人打ちは親が交互に2周する", () => {
+    const { game } = makeGame(rigWall("ねこさくらくるまたぬききつ", "いぬそらやまかさはないすと", "ね"));
+    const dealers = [0, 1, 2, 3].map((kyoku) => {
+      Object.assign(game as unknown as { kyoku: number }, { kyoku });
+      const v = game.viewFor("a");
+      return [v.dealer, v.seats[0].wind];
+    });
+    game.destroy();
+    expect(dealers).toEqual([
+      [0, 0],
+      [1, 1],
+      [0, 0],
+      [1, 1],
+    ]);
   });
 });
