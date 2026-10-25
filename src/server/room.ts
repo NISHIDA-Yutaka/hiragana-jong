@@ -45,6 +45,8 @@ export class Room {
   lastActive = Date.now();
   /** デバッグ用：次の配牌で配る牌の予約（メンバーID → 予約）。部屋の状態としては誰にも送らない */
   debugRigs = new Map<string, DealRig>();
+  /** デバッグ：鳴きたがりにしたCPU（メンバーID） */
+  debugNaki = new Set<string>();
   private chatSeq = 0;
   private roomLexCache: Lexicon | null = null;
   private io: RoomIO;
@@ -322,6 +324,7 @@ export class Room {
           this.debugRigs.clear();
           return out;
         },
+        debugNaki: (seat) => this.debugNaki.has(this.seatedIds[seat]),
       },
     });
     for (const m of seated) if (!m.isBot && m.sockets.size === 0) this.game.setConnected(m.id, false);

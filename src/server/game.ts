@@ -65,6 +65,8 @@ interface CallState {
   /** 自己申告：ポン・カンのボタンを出すか */
   canPon: boolean;
   canKan: boolean;
+  /** デバッグ（鳴きたがりのCPU）：鳴くと決めた語の牌ID（語の順） */
+  botCall?: { call: "pon" | "kan"; tileIds: number[] } | null;
 }
 
 interface Claim {
@@ -122,12 +124,18 @@ export interface GameHooks {
   record?: (rec: AgariRecord) => void;
   /** デバッグ用：次の配牌で配る牌の予約を受け取る（席 → 予約）。受け取った予約は消える */
   takeRigs?: () => Map<number, DealRig>;
+  /** デバッグ用：その席のCPUを鳴きたがりにしているか（鳴ける語があれば必ずポン・カンする） */
+  debugNaki?: (seat: number) => boolean;
 }
 
-/** デバッグ用の配牌の予約。random のときは、語ごとにまとめたまま手牌のランダムな位置に入れる */
+/**
+ * デバッグ用の配牌の予約。random のときは、語ごとにまとめたまま手牌のランダムな位置に入れる。
+ * melds は、局の始めから鳴いた形で持たせる語（1つにつき手牌が3枚減る）
+ */
 export interface DealRig {
   words: string[];
   random: boolean;
+  melds?: { type: MeldType; word: string }[];
 }
 
 /** ロン牌を入れる場所を選ぶ時間・ポンやカンの語を選ぶ時間 */
@@ -358,8 +366,10 @@ export class Game {
       }
     }
     this.wall = tiles;
-    const rigs = this.placeRigs(this.hooks.takeRigs?.());
-    this.rigged = rigs.size > 0;
+    const taken = this.hooks.takeRigs?.();
+    const meldRigs = this.pullMeldTiles(taken);
+    const rigs = this.placeRigs(taken);
+    this.rigged = rigs.size > 0 || meldRigs.size > 0;
     this.drawPos = 0;
     this.rinshanTaken = 0;
     this.noCallYet = true;
@@ -392,6 +402,7 @@ export class Game {
         this.hands[s].hand.push(this.wall[this.drawPos++]);
       }
     }
+    for (const [seat, melds] of meldRigs) this.giveMelds(seat, melds, rigs.get(seat)?.groups.flat() ?? []);
     for (const hp of this.hands) hp.arr = reconcile(null, hp.hand);
     for (const [seat, r] of rigs) this.hands[seat].arr = rigArrangement(r.groups, r.random, this.hands[seat].hand);
     this.emit("start", this.dealer, `${WIND_NAMES[this.roundWind]}${this.kyoku + 1}局`);
@@ -445,6 +456,61 @@ export class Game {
       if (groups.length) out.set(seat, { groups, random });
     }
     return out;
+  }
+
+  /**
+   * デバッグ用：鳴いた形で持たせる語の牌を、山から抜いておく（配る前）。
+   * 足りない文字があればその語はあきらめて、抜いた牌を山に戻す
+   */
+  private pullMeldTiles(rigs: Map<number, DealRig> | undefined): Map<number, Meld[]> {
+    const out = new Map<number, Meld[]>();
+    if (!rigs) return out;
+    for (const [seat, rig] of rigs) {
+      const melds: Meld[] = [];
+      for (const { type, word } of rig.melds ?? []) {
+        const tiles: Tile[] = [];
+        for (const ch of word) {
+          const from = this.wall.map((t, i) => (t.ch === ch ? i : -1)).filter((i) => i >= 0);
+          if (from.length === 0) break;
+          tiles.push(this.wall.splice(from[Math.floor(Math.random() * from.length)], 1)[0]);
+        }
+        if (tiles.length < [...word].length) {
+          this.wall.push(...tiles);
+          continue;
+        }
+        const ankan = type === "ankan";
+        // 鳴いた牌は上家から出たことにする（河には出さない）
+        const calledId = ankan ? null : tiles[Math.floor(Math.random() * tiles.length)].id;
+        melds.push({ type, tiles, word, from: ankan ? null : (seat - 1 + this.n) % this.n, calledId });
+      }
+      if (melds.length) out.set(seat, melds);
+    }
+    return out;
+  }
+
+  /**
+   * デバッグ用：配った手牌から鳴いた語1つにつき3枚を山に戻し、鳴いた語を持たせる。
+   * /set で配った牌（keep）は戻さない。戻す牌は、まだツモっていない山（王牌より前）のランダムな位置に入れる。
+   * 配る前に山から抜いた鳴きの牌の分だけ山が短くなるので、4文字以上のカンはリンシャンでツモったのと同じだけツモれる山が減る
+   */
+  private giveMelds(seat: number, melds: Meld[], keep: number[]) {
+    const hp = this.hands[seat];
+    const kept = new Set(keep);
+    for (let i = 0; i < 3 * melds.length; i++) {
+      const cand = hp.hand.filter((t) => !kept.has(t.id));
+      if (cand.length === 0) break;
+      const t = cand[Math.floor(Math.random() * cand.length)];
+      hp.hand.splice(hp.hand.indexOf(t), 1);
+      // 配ったときの位置から抜いて（配り終えた所なので、ツモの位置を1つ詰める）、まだツモっていない所へ入れ直す
+      this.wall.splice(this.wall.indexOf(t), 1);
+      this.drawPos--;
+      const pos = this.drawPos + Math.floor(Math.random() * (this.wall.length - 14 - this.drawPos + 1));
+      this.wall.splice(pos, 0, t);
+    }
+    hp.melds = melds;
+    if (melds.some((m) => m.type !== "ankan")) hp.called = true;
+    for (const m of melds) if (m.type !== "pon") this.kanOwners.push(seat);
+    this.noCallYet = false;
   }
 
   private endRiipai() {
@@ -695,8 +761,10 @@ export class Game {
       const hp = this.hands[s];
       const cs = this.callOptions(s, d.tile);
       const p = this.players[s];
-      // ボットはロンできるときだけ、切断中の人は参加しない
-      if (p.isBot ? !cs.ron : !p.connected) {
+      // デバッグで鳴きたがりにしたCPUは、鳴ける語があれば鳴く
+      cs.botCall = p.isBot && canCall && !hp.riichi && !cs.ron && this.hooks.debugNaki?.(s) ? this.nakiCall(s, d.tile) : null;
+      // ボットはロンできるとき（と鳴くとき）だけ、切断中の人は参加しない
+      if (p.isBot ? !cs.ron && !cs.botCall : !p.connected) {
         if (cs.ron || cs.ronMissed) this.missRon(s, d.tile.ch);
         continue;
       }
@@ -771,7 +839,7 @@ export class Game {
       cs.response = r;
       this.clearTimer(`bot-call-${seat}`);
       // 受付時間が終わるか、全員が応答したら締め切る（ロンの重なりや頭ハネに備えて途中では締めない）
-      const allDone = [...this.calls.values()].every((c) => c.response || (this.players[c.seat].isBot && !c.ron));
+      const allDone = [...this.calls.values()].every((c) => c.response || (this.players[c.seat].isBot && !c.ron && !c.botCall));
       if (allDone) {
         this.clearTimer("window");
         this.windowDeadline = null;
@@ -807,6 +875,13 @@ export class Game {
       this.calls.clear();
       this.step = "claim";
       this.callDetail = { seat: c.seat, call: c.response!.call as "pon" | "kan", deadline: Date.now() + CALL_DETAIL_MS, extended: false };
+      if (c.botCall) {
+        // 鳴きたがりのCPU：決めておいた語で鳴く。この局のアガリは記録しない
+        this.rigged = true;
+        const ids = c.botCall.tileIds;
+        this.setTimer("detail", this.botDelay(), () => this.resolveCallDetail(c.seat, ids));
+        return;
+      }
       this.setTimer("detail", this.fast ? 0 : CALL_DETAIL_MS, () => this.resolveCallDetail(c.seat, null));
       return;
     }
@@ -1591,6 +1666,7 @@ export class Game {
       this.autoDiscard(seat);
       return;
     }
+    if (!this.afterCall && this.hooks.debugNaki?.(seat) && this.nakiSelfKan(seat)) return;
     const choice = brain.chooseDiscard(hp.hand, hp.melds.length, this.visibleCounts(seat));
     hp.arr = choice.arrangement;
     let riichi: "riichi" | undefined;
@@ -1603,7 +1679,85 @@ export class Game {
     const cs = this.calls.get(seat);
     if (!cs || cs.response) return;
     if (cs.ron) this.respondCall(seat, { call: "ron" });
+    else if (cs.botCall) this.respondCall(seat, { call: cs.botCall.call });
     else this.respondCall(seat, { call: "pass" });
+  }
+
+  /**
+   * デバッグ（鳴きたがりのCPU）：手牌から k 枚を選んで並べ、extra を挟んだ（なければそのままの）並びが辞書にある語を探す。
+   * 見つかれば語の順の牌ID
+   */
+  private findNakiWord(seat: number, k: number, extra: Tile | null): number[] | null {
+    const lx = this.lex(seat);
+    const hand = this.hands[seat].hand;
+    const pick: Tile[] = [];
+    const used = new Set<number>();
+    const rec = (): number[] | null => {
+      if (pick.length === k) {
+        for (let p = 0; p <= (extra ? k : 0); p++) {
+          const ts = extra ? [...pick.slice(0, p), extra, ...pick.slice(p)] : pick;
+          if (lx.lookup(ts.map((t) => t.ch).join(""))) return ts.map((t) => t.id);
+        }
+        return null;
+      }
+      const tried = new Set<string>();
+      for (const t of hand) {
+        if (used.has(t.id) || tried.has(t.ch)) continue;
+        tried.add(t.ch);
+        used.add(t.id);
+        pick.push(t);
+        const r = rec();
+        pick.pop();
+        used.delete(t.id);
+        if (r) return r;
+      }
+      return null;
+    };
+    return rec();
+  }
+
+  /** 鳴きたがりのCPU：捨て牌でカン（4文字）かポン（3文字）できる語。カンを優先する */
+  private nakiCall(seat: number, tile: Tile): { call: "pon" | "kan"; tileIds: number[] } | null {
+    const hp = this.hands[seat];
+    if (this.totalKans() < 4 && this.liveRemaining >= 1 && hp.hand.length >= 4) {
+      const ids = this.findNakiWord(seat, 3, tile);
+      if (ids) return { call: "kan", tileIds: ids };
+    }
+    if (hp.hand.length < 3) return null;
+    const ids = this.findNakiWord(seat, 2, tile);
+    return ids ? { call: "pon", tileIds: ids } : null;
+  }
+
+  /** 鳴きたがりのCPU：自分の手番で加カン・暗カン（4文字）できればする。したら true */
+  private nakiSelfKan(seat: number): boolean {
+    const hp = this.hands[seat];
+    if (this.totalKans() >= 4 || this.liveRemaining < 1) return false;
+    const lx = this.lex(seat);
+    const tryOpt = (arr: Arrangement, kind: "ankan" | "kakan", word: string, ids: number[]) => {
+      hp.arr = arr;
+      this.turnActions = this.computeTurnActions(seat);
+      const opt = this.turnActions[kind].find((o) => o.word === word && o.tileIds.join() === ids.join());
+      if (!opt) return false;
+      this.rigged = true;
+      return (kind === "ankan" ? this.doAnkan(seat, opt.id) : this.doKakan(seat, opt.id)) === null;
+    };
+    for (const m of hp.melds) {
+      if (m.type !== "pon") continue;
+      for (const t of hp.hand) {
+        for (let p = 0; p <= 3; p++) {
+          const tiles = [...m.tiles.slice(0, p), t, ...m.tiles.slice(p)];
+          const word = tiles.map((x) => x.ch).join("");
+          if (!lx.lookup(word)) continue;
+          const rest = hp.hand.filter((x) => x.id !== t.id).map((x) => x.id);
+          if (tryOpt({ order: [t.id, ...rest], breaks: [t.id] }, "kakan", word, tiles.map((x) => x.id))) return true;
+        }
+      }
+    }
+    const ids = this.findNakiWord(seat, 4, null);
+    if (!ids) return false;
+    const byId = new Map(hp.hand.map((t) => [t.id, t.ch]));
+    const rest = hp.hand.map((t) => t.id).filter((id) => !ids.includes(id));
+    return tryOpt({ order: [...ids, ...rest], breaks: [ids[ids.length - 1]] }, "ankan", ids.map((id) => byId.get(id)).join(""), ids);
   }
 
   private visibleCounts(seat: number): Int8Array {

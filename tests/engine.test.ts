@@ -826,6 +826,170 @@ describe("デバッグ：配牌の指定", () => {
   });
 });
 
+describe("デバッグ：鳴いた形で配る・鳴きたがりのCPU", () => {
+  const lex2 = lex.extend(["おみやげ", "くるまや"].map((word) => ({ word, verified: false })));
+  const newGame = (rigs: Map<number, DealRig>, opts: { n?: 2 | 4; bot?: boolean; naki?: boolean } = {}) => {
+    const n = opts.n ?? 4;
+    const game = new Game({
+      settings: { ...DEFAULT_SETTINGS, playerCount: n, extraTiles: true, timer: "none", riipaiSeconds: 0 },
+      fast: true,
+      players: ["a", "b", "c", "d"].slice(0, n).map((id, i) => ({ id, name: id.toUpperCase(), isBot: !!opts.bot && i > 0, botLevel: "normal" as const, botLex: opts.bot && i > 0 ? lex2 : undefined })),
+      hooks: { update: () => {}, wordApproved: () => {}, playerLex: () => lex2, theme: () => null, takeRigs: () => rigs, debugNaki: (seat) => !!opts.naki && seat > 0 },
+    });
+    game.start();
+    return game;
+  };
+  const wait = async (ok: () => boolean) => {
+    for (let i = 0; i < 200 && !ok(); i++) await new Promise((r) => setTimeout(r, 5));
+  };
+
+  it("局の始めから鳴いた語を持ち、手牌は1つにつき3枚減る。牌の総数は変わらない", () => {
+    for (let i = 0; i < 20; i++) {
+      const game = newGame(
+        new Map([
+          [
+            1,
+            {
+              words: ["さくら"],
+              random: false,
+              melds: [
+                { type: "pon", word: "くるま" },
+                { type: "ankan", word: "おみやげ" },
+              ],
+            },
+          ],
+        ]),
+      );
+      const plain = newGame(new Map());
+      const vb = game.viewFor("b");
+      expect(vb.myHand).toHaveLength(7);
+      const byId = new Map(vb.myHand.map((t) => [t.id, t.ch]));
+      expect(vb.arrangement!.order.slice(0, 3).map((id) => byId.get(id)).join("")).toBe("さくら");
+      // ほかの人から見ても、語の順に牌が並んでいる
+      const seen = game.viewFor("a").seats[1].melds;
+      expect(seen.map((m) => [m.type, m.word, m.tiles.map((t) => t.ch).join("")])).toEqual([
+        ["pon", "くるま", "くるま"],
+        ["ankan", "おみやげ", "おみやげ"],
+      ]);
+      expect(seen[0].from).toBe(0);
+      expect(seen[1].calledId).toBeNull();
+      // 暗カン（4文字）の分だけ、ツモれる山が1枚減る
+      expect(game.viewFor("a").liveRemaining).toBe(plain.viewFor("a").liveRemaining - 1);
+      const wall = (game as unknown as { wall: { ch: string }[] }).wall.map((t) => t.ch);
+      const melded = seen.flatMap((m) => m.tiles.map((t) => t.ch));
+      expect([...wall, ...melded].sort()).toEqual([...buildTileChars(true)].sort());
+      game.destroy();
+      plain.destroy();
+    }
+  });
+
+  it("鳴きたがりのCPUは、捨て牌で語が作れればポンする", async () => {
+    const game = newGame(
+      new Map([
+        [0, { words: ["ら"], random: false }],
+        [1, { words: ["さく"], random: false }],
+      ]),
+      { n: 2, bot: true, naki: true },
+    );
+    const ra = game.viewFor("a").myHand.find((t) => t.ch === "ら")!;
+    expect(game.act("a", { type: "discard", tileId: ra.id })).toBeNull();
+    await wait(() => game.viewFor("a").seats[1].melds.length > 0);
+    const m = game.viewFor("a").seats[1].melds[0];
+    expect([m.type, m.word, m.calledId]).toEqual(["pon", "さくら", ra.id]);
+    game.destroy();
+  });
+
+  it("鳴きたがりのCPUは、手牌で4文字の語ができれば暗カンする", async () => {
+    const game = newGame(
+      new Map([
+        [0, { words: ["ねこ"], random: false }],
+        [1, { words: ["おみやげ"], random: false }],
+      ]),
+      { n: 2, bot: true, naki: true },
+    );
+    const ne = game.viewFor("a").myHand.find((t) => t.ch === "ね")!;
+    expect(game.act("a", { type: "discard", tileId: ne.id })).toBeNull();
+    await wait(() => game.viewFor("a").seats[1].melds.length > 0);
+    const m = game.viewFor("a").seats[1].melds[0];
+    expect([m.type, m.word]).toEqual(["ankan", "おみやげ"]);
+    game.destroy();
+  });
+
+  it("鳴きたがりのCPUは、ポンした語に1枚足して語ができれば加カンする", async () => {
+    const game = newGame(
+      new Map([
+        [0, { words: ["ゆ"], random: false }],
+        [1, { words: ["や"], random: false, melds: [{ type: "pon" as const, word: "くるま" }] }],
+      ]),
+      { n: 2, bot: true, naki: true },
+    );
+    const yu = game.viewFor("a").myHand.find((t) => t.ch === "ゆ")!;
+    expect(game.act("a", { type: "discard", tileId: yu.id })).toBeNull();
+    await wait(() => game.viewFor("a").seats[1].melds[0].type === "kakan");
+    const m = game.viewFor("a").seats[1].melds[0];
+    expect([m.type, m.word]).toEqual(["kakan", "くるまや"]);
+    game.destroy();
+  });
+
+  it("鳴きたがりでなければ、CPUは鳴かない", async () => {
+    const game = newGame(
+      new Map([
+        [0, { words: ["ら"], random: false }],
+        [1, { words: ["さく"], random: false }],
+      ]),
+      { n: 2, bot: true },
+    );
+    const ra = game.viewFor("a").myHand.find((t) => t.ch === "ら")!;
+    game.act("a", { type: "discard", tileId: ra.id });
+    await wait(() => game.viewFor("a").turn === 0);
+    expect(game.viewFor("a").seats[1].melds).toHaveLength(0);
+    game.destroy();
+  });
+});
+
+describe("デバッグ：/meld・/naki コマンド", () => {
+  const lobby = () => {
+    const room = new Room("TEST", { broadcast: () => {} });
+    const me = room.addHuman("わたし");
+    room.settings.extraTiles = true;
+    const bot = room.addBot("normal") as Member;
+    return { room, me, bot };
+  };
+  const run = (room: Room, me: Member, text: string) => debugCommand(room, me, text);
+
+  it("3文字はポン、4文字以上はカン。種類を書けばその種類で、打つたびに足していく", () => {
+    const { room, me, bot } = lobby();
+    expect(run(room, me, `/meld @${bot.name} くるま おみやげ`)).not.toHaveProperty("error");
+    expect(run(room, me, `/meld @${bot.name} 暗カン たぬきそば`)).not.toHaveProperty("error");
+    expect(room.debugRigs.get(bot.id)!.melds).toEqual([
+      { type: "pon", word: "くるま" },
+      { type: "minkan", word: "おみやげ" },
+      { type: "ankan", word: "たぬきそば" },
+    ]);
+    // 鳴いた語が3つなら、配牌は4枚まで
+    expect(run(room, me, `/set @${bot.name} あいうえお`)).toHaveProperty("error");
+    expect(run(room, me, `/set @${bot.name} あいうえ`)).not.toHaveProperty("error");
+    expect(room.debugRigs.get(bot.id)!.melds).toHaveLength(3);
+  });
+
+  it("ポンは3文字・カンは4〜8文字・鳴いた語は4つまで", () => {
+    const { room, me } = lobby();
+    expect(run(room, me, "/meld ポン おみやげ")).toHaveProperty("error");
+    expect(run(room, me, "/meld カン ねこ")).toHaveProperty("error");
+    expect(run(room, me, "/meld くるま とまと")).not.toHaveProperty("error");
+    expect(run(room, me, "/meld さくら くるま たぬき")).toHaveProperty("error");
+  });
+
+  it("/naki はCPUだけ。on・off と切り替え", () => {
+    const { room, me, bot } = lobby();
+    expect(run(room, me, "/naki @わたし on")).toHaveProperty("error");
+    expect(run(room, me, `/naki @${bot.name} on`)).not.toHaveProperty("error");
+    expect(room.debugNaki.has(bot.id)).toBe(true);
+    expect(run(room, me, `/naki @${bot.name}`)).not.toHaveProperty("error");
+    expect(room.debugNaki.has(bot.id)).toBe(false);
+  });
+});
+
 describe("デバッグ：/set コマンド", () => {
   const lobby = () => {
     const room = new Room("TEST", { broadcast: () => {} });
