@@ -1203,6 +1203,14 @@ fieldset:disabled .seg button:not(.on) {
   font-size: 12px;
   font-weight: 700;
 }
+/* 正面と右の席は卓ごと回しているので、そのままだと語が右から左（下から上）に読める。
+   並びを逆にして、自分から見て左から右（上から下）に読めるようにする。鳴いた順も同じ向きにそろえる */
+.zone-top .opp-melds,
+.zone-top .opp-melds .meld-tiles,
+.zone-right .opp-melds,
+.zone-right .opp-melds .meld-tiles {
+  flex-direction: row-reverse;
+}
 .meld-peek-label b {
   color: #fff;
   font-size: 15px;
