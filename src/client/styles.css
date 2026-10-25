@@ -1192,6 +1192,8 @@ fieldset:disabled .seg button:not(.on) {
 }
 .meld-peekable {
   cursor: zoom-in;
+  /* 3D の卓は丸ごと pointer-events: none にしているので、鳴いた語だけマウスを受け取れるように戻す */
+  pointer-events: auto;
 }
 /* 相手の鳴いた語は卓の布から浮かせて目立たせる */
 .opp-melds .meld {
