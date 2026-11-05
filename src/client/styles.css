@@ -959,6 +959,19 @@ fieldset:disabled .seg button:not(.on) {
   font-weight: 900;
   letter-spacing: 0.1em;
 }
+.cb-genre {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+.cb-genre small {
+  color: var(--gold);
+  font-size: 10px;
+}
 .cb-sub {
   display: flex;
   gap: 10px;
@@ -1902,6 +1915,16 @@ fieldset:disabled .seg button:not(.on) {
     0 0 28px rgba(255, 200, 60, 1),
     0 6px 0 rgba(0, 0, 0, 0.4);
 }
+.callout-genre {
+  animation-duration: 2.6s;
+}
+.callout-genre .co-text {
+  font-size: 64px;
+  -webkit-text-stroke-color: #0b6b4f;
+  text-shadow:
+    0 0 26px rgba(90, 230, 170, 0.95),
+    0 6px 0 rgba(0, 0, 0, 0.4);
+}
 .callout-kan .co-text,
 .callout-ankan .co-text,
 .callout-kakan .co-text {
@@ -2519,6 +2542,22 @@ fieldset:disabled .seg button:not(.on) {
   color: var(--gold);
   letter-spacing: 0.12em;
   text-shadow: 0 0 24px rgba(231, 196, 108, 0.6);
+}
+.rb-genre {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 12px;
+  margin: 2px 0 6px;
+  color: #fff;
+  font-size: 34px;
+  font-weight: 900;
+  text-shadow: 0 0 18px rgba(90, 230, 170, 0.8);
+}
+.rb-genre small {
+  color: var(--gold);
+  font-size: 16px;
+  text-shadow: none;
 }
 .rb-time {
   font-size: 64px;

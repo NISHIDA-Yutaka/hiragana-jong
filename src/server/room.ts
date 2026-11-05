@@ -5,8 +5,8 @@ import { kindsOfWord, Lexicon } from "../shared/lexicon";
 import { BotLevel, ChatMessage, DEFAULT_SETTINGS, GameAction, handEndSeq, RoomSettings, RoomView } from "../shared/protocol";
 import { checkKuyou } from "../shared/kuyou";
 import { normalizeInput, tileSupply, toSeion } from "../shared/tiles";
-import { THEMES } from "../shared/yaku";
-import { getBaseLexicon, getBotLexicon } from "./dict";
+import type { Genre } from "../shared/yaku";
+import { getBaseLexicon, getBotLexicon, getGenres } from "./dict";
 import { appendAgari } from "./agariLog";
 import { DealRig, Game } from "./game";
 
@@ -18,7 +18,6 @@ export interface Member {
   botLevel?: BotLevel;
   sockets: Set<string>;
   myWords: string[];
-  theme: { name: string; pure: boolean } | null;
   joinedAt: number;
 }
 
@@ -66,7 +65,6 @@ export class Room {
       isBot: false,
       sockets: new Set(),
       myWords: [],
-      theme: null,
       joinedAt: Date.now(),
     };
     this.members.push(m);
@@ -87,7 +85,6 @@ export class Room {
       botLevel: level,
       sockets: new Set(),
       myWords: [],
-      theme: null,
       joinedAt: Date.now(),
     };
     this.members.push(m);
@@ -227,10 +224,6 @@ export class Room {
     return out;
   }
 
-  setTheme(m: Member, theme: { name: string; pure: boolean } | null) {
-    m.theme = theme && THEMES.includes(theme.name) ? { name: theme.name, pure: !!theme.pure } : null;
-  }
-
   private dictConfig() {
     return { level: this.settings.dictLevel, seion: this.settings.seion, extraTiles: this.settings.extraTiles };
   }
@@ -301,6 +294,7 @@ export class Room {
     this.watching.clear(); // 席順が変わるので、観戦で見ている席は選び直し
     const cfg = this.dictConfig();
     this.roomLex(); // 辞書を先に用意
+    let lastGenre: Genre | null = null;
     this.game = new Game({
       settings: { ...this.settings },
       players: seated.map((m, i) => ({
@@ -314,7 +308,13 @@ export class Room {
         update: () => this.io.broadcast(this),
         wordApproved: (w) => this.addRoomWord(w),
         playerLex: (id) => this.playerLex(id),
-        theme: (id) => this.member(id)?.theme ?? null,
+        drawGenre: () => {
+          // 同じジャンルが続かないようにする
+          const all = getGenres(this.settings.seion);
+          const rest = all.filter((x) => x !== lastGenre);
+          lastGenre = rest[Math.floor(Math.random() * rest.length)] ?? null;
+          return lastGenre;
+        },
         record: (rec) => appendAgari({ ...rec, room: this.code }),
         takeRigs: () => {
           const out = new Map<number, DealRig>();

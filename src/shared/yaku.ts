@@ -1,6 +1,12 @@
 // 役と点数の計算（ルールブック第6章）
 import { firstChar, gyouOf, isSpecial, lastChar, vowelOf } from "./tiles";
 
+/** 同種ドラのジャンル。words は語リストなのでサーバーの外に出さない */
+export interface Genre {
+  name: string;
+  words: ReadonlySet<string>;
+}
+
 export interface WordGroup {
   word: string;
   /** ポン・明カン・加カン以外（手牌の語と暗カン） */
@@ -20,8 +26,8 @@ export interface YakuInput {
   ippatsu: boolean;
   tenhou: boolean;
   chiihou: boolean;
-  /** 承認された同種のテーマ宣言（pure=頭を含む＝純同種） */
-  theme: null | { name: string; pure: boolean };
+  /** この局の同種ドラのジャンル */
+  genre?: Genre | null;
   /**
    * 濁音など＋30牌ありか（省略時はあり）。基本の牌は特殊文字が「ー」1枚だけなので、
    * 清文はほぼ必ず付き、特文・純特文・特殊文字ドラは作れない。そのため基本の牌ではこれらを数えない
@@ -214,12 +220,6 @@ export function computeYaku(inp: YakuInput): YakuResult {
     if (specialYaku && words.every(hasSp)) add("純特文", allConcealed ? 4 : 3);
     else if (specialYaku && body.every((i) => hasSp(words[i]))) add("特文", bodyConcealed ? 3 : 2);
 
-    // 同種・純同種（宣言して承認されたとき）
-    if (inp.theme) {
-      if (inp.theme.pure) add("純同種", allConcealed ? 5 : 4, { note: inp.theme.name });
-      else add("同種", bodyConcealed ? 4 : 3, { note: inp.theme.name });
-    }
-
     // 重言・同言
     const same = new Map<string, number[]>();
     words.forEach((w, i) => same.set(w, [...(same.get(w) ?? []), i]));
@@ -240,6 +240,10 @@ export function computeYaku(inp: YakuInput): YakuResult {
   if (kanDora > 0) add("カンドラ", kanDora, { sub: true });
   const sp = inp.tiles.filter(isSpecial).length;
   if (specialYaku && sp >= 4) add("特殊文字ドラ", sp - 3, { sub: true });
+  // 同種ドラ：局のジャンルに合う語1つにつき1翻。頭や鳴いた語も数え、文章の作文は語に分けられないので数えない
+  const genre = inp.genre;
+  const genreWords = genre && inp.form !== "sakubun" ? words.filter((w) => genre.words.has(w)) : [];
+  if (genre && genreWords.length) add("同種ドラ", genreWords.length, { sub: true, note: `${genre.name}：${genreWords.join("・")}` });
 
   const mainHan = items.filter((x) => !x.sub && !x.yakuman).reduce((a, b) => a + b.han, 0) + (items.some((x) => x.yakuman) ? 13 : 0);
   const han = items.filter((x) => !x.yakuman).reduce((a, b) => a + b.han, 0);
@@ -275,5 +279,3 @@ export function paymentFor(han: number, yakuman: boolean, dealer: boolean): Paym
   if (dealer) return { ron: r[4], tsumoChild: r[5], tsumoDealer: r[5] };
   return { ron: r[1], tsumoChild: r[2], tsumoDealer: r[3] };
 }
-
-export const THEMES = ["生き物", "自然（植物含む）", "人間", "地名", "歴史", "飲食物", "機械／道具", "ファンタジー", "生活", "政治", "経済", "春", "夏", "秋", "冬"];

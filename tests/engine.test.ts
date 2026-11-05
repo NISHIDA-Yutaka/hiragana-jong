@@ -1,12 +1,14 @@
+import { readFileSync } from "fs";
 import { checkKuyou } from "../src/shared/kuyou";
 import { describe, expect, it } from "vitest";
 import { checkComplete, completeWith, groupsWithChars, reconcile } from "../src/shared/arrange";
 import { Lexicon } from "../src/shared/lexicon";
 import { DEFAULT_SETTINGS, type RoomSettings } from "../src/shared/protocol";
-import { buildTileChars, tileSupply } from "../src/shared/tiles";
-import { computeYaku, paymentFor, type WordGroup, type YakuInput } from "../src/shared/yaku";
+import { buildTileChars, tileSupply, toSeion } from "../src/shared/tiles";
+import { computeYaku, type Genre, paymentFor, type WordGroup, type YakuInput } from "../src/shared/yaku";
 import { type DealRig, Game } from "../src/server/game";
 import { debugCommand } from "../src/server/debug";
+import { getGenres, getWordList } from "../src/server/dict";
 import { Member, Room } from "../src/server/room";
 import { reachedFamilies, searchArrangements } from "../src/shared/yakuSearch";
 
@@ -28,7 +30,6 @@ const base = (groups: WordGroup[], extra: Partial<YakuInput> = {}): YakuInput =>
   ippatsu: false,
   tenhou: false,
   chiihou: false,
-  theme: null,
   ...extra,
 });
 const names = (r: ReturnType<typeof computeYaku>) => Object.fromEntries(r.items.map((i) => [i.name, i.han]));
@@ -153,7 +154,7 @@ function rigWall(h0: string, h1: string, draws: string): string[] {
   return [...head, ...rest];
 }
 
-function makeGame(wall: string[], opts: { myWords?: string[]; settings?: Partial<RoomSettings>; themeB?: { name: string; pure: boolean } } = {}) {
+function makeGame(wall: string[], opts: { myWords?: string[]; settings?: Partial<RoomSettings>; genre?: Genre } = {}) {
   const settings: RoomSettings = { ...DEFAULT_SETTINGS, playerCount: 2, timer: "none", riipaiSeconds: 0, ...opts.settings };
   const p1lex = opts.myWords ? lex.extend(opts.myWords.map((word) => ({ word, verified: false }))) : lex;
   const approved: string[] = [];
@@ -169,7 +170,7 @@ function makeGame(wall: string[], opts: { myWords?: string[]; settings?: Partial
       update: () => {},
       wordApproved: (w) => approved.push(w),
       playerLex: (id) => (id === "b" ? p1lex : lex),
-      theme: (id) => (id === "b" ? (opts.themeB ?? null) : null),
+      drawGenre: () => opts.genre ?? null,
     },
   });
   game.start();
@@ -601,10 +602,10 @@ describe("作れる役の探索（役のバランス検証用）", () => {
   });
 });
 
-describe("同種（宣言のみの役）だけでアガる", () => {
-  // B の手「いぬ・くるま・たぬき・かもめ・さく」は「ら」待ちで、同種のほかに役がない
+describe("同種ドラだけではアガれない", () => {
+  // B の手「いぬ・くるま・たぬき・かもめ・さく」は「ら」待ちで、ほかに役がない
   const wall = () => rigWall("ららそやまはなほへれろわそ", "いぬくるまたぬきかもめさく", "とほへ");
-  const theme = { name: "生き物", pure: false };
+  const genre: Genre = { name: "動物", words: new Set(["いぬ", "たぬき", "かもめ"]) };
   /** 地和にならないよう、1巡回してから A が「ら」を捨てる */
   const discardRa = (game: Game) => {
     const pass = (id: string) => game.viewFor(id).actions?.kind === "call" && game.act(id, { type: "call", call: "pass" });
@@ -615,23 +616,8 @@ describe("同種（宣言のみの役）だけでアガる", () => {
     game.act("a", { type: "discard", tileId: game.viewFor("a").myHand.find((t) => t.ch === "ら")!.id });
   };
 
-  it("宣言していれば他に役がなくてもロンでき、テーマが認められればアガリ", () => {
-    const { game } = makeGame(wall(), { themeB: theme });
-    arrangeAs(game, "b", ["いぬ", "くるま", "たぬき", "かもめ", "さく"]);
-    discardRa(game);
-    expect(game.act("b", { type: "call", call: "ron" })).toBeNull();
-    expect(game.act("b", { type: "ronPlace", group: 4, pos: 2 })).toBeNull();
-    const va = game.viewFor("a");
-    expect(va.phase).toBe("vote");
-    expect(va.vote!.items.some((i) => i.kind === "theme")).toBe(true);
-    game.act("a", { type: "vote", votes: {} });
-    const r = game.viewFor("a").result!;
-    expect(r.kind).toBe("agari");
-    expect(r.wins[0].yaku.map((y) => y.name)).toContain("同種");
-  });
-
-  it("宣言していなければ役なしのロンはチョンボ", () => {
-    const { game } = makeGame(wall());
+  it("ジャンルに合う語が3つあっても、ほかに役がなければチョンボ", () => {
+    const { game } = makeGame(wall(), { genre });
     arrangeAs(game, "b", ["いぬ", "くるま", "たぬき", "かもめ", "さく"]);
     discardRa(game);
     game.act("b", { type: "call", call: "ron" });
@@ -639,19 +625,6 @@ describe("同種（宣言のみの役）だけでアガる", () => {
     const r = game.viewFor("a").result!;
     expect(r.kind).toBe("chombo");
     expect(r.note).toContain("役がありません");
-  });
-
-  it("テーマが認められず役がなくなったときは、チョンボにせず取り消すだけ", () => {
-    const { game } = makeGame(wall(), { themeB: theme });
-    arrangeAs(game, "b", ["いぬ", "くるま", "たぬき", "かもめ", "さく"]);
-    discardRa(game);
-    game.act("b", { type: "call", call: "ron" });
-    game.act("b", { type: "ronPlace", group: 4, pos: 2 });
-    const item = game.viewFor("a").vote!.items.find((i) => i.kind === "theme")!;
-    game.act("a", { type: "vote", votes: { [item.id]: false } });
-    const v = game.viewFor("a");
-    expect(v.result).toBeNull();
-    expect(v.phase).toBe("play");
   });
 });
 
@@ -707,7 +680,7 @@ describe("観戦", () => {
   });
 });
 
-describe("重回文・同種を対局の中で確かめる", () => {
+describe("重回文・同種ドラを対局の中で確かめる", () => {
   // B の手「あい・たしか・かした・さくら・くる」は「ま」待ち（くるま）
   const wall = () => rigWall("まそやまはなほへれろわそら", "あいたしかかしたさくらくる", "とほへ");
   /** 1巡回してから A が「ま」を捨て、B がロンして「くる」に入れる */
@@ -732,28 +705,80 @@ describe("重回文・同種を対局の中で確かめる", () => {
     expect(yakuOf(game)["重回文"]).toBe(5);
   });
 
-  it("純同種を宣言して認められると、門前で5翻が付く", () => {
-    const { game } = makeGame(wall(), { themeB: { name: "ことば", pure: true } });
+  it("ジャンルに合う語の数だけ同種ドラが付き、投票なしでアガリになる", () => {
+    const { game } = makeGame(wall(), { genre: { name: "ことば", words: new Set(["あい", "さくら"]) } });
+    expect(game.viewFor("a").genre).toBe("ことば");
     arrangeAs(game, "b", ["あい", "たしか", "かした", "さくら", "くる"]);
     ronMa(game);
-    const item = game.viewFor("a").vote!.items.find((i) => i.kind === "theme")!;
-    expect(item.text).toContain("純同種");
-    game.act("a", { type: "vote", votes: {} });
-    const y = yakuOf(game);
-    expect(y["純同種"]).toBe(5);
-    expect(y["重回文"]).toBe(5);
+    // 「かした」は辞書にあるので投票もない
+    expect(game.viewFor("a").phase).toBe("result");
+    const dora = game.viewFor("a").result!.wins[0].yaku.find((y) => y.name === "同種ドラ")!;
+    expect(dora).toMatchObject({ han: 2, sub: true, note: "ことば：あい・さくら" });
+    expect(yakuOf(game)["重回文"]).toBe(5);
+  });
+});
+
+describe("同種ドラ", () => {
+  const genre: Genre = { name: "動物", words: new Set(["いぬ", "ねこ", "たぬき", "きつね", "おみやげ"]) };
+
+  it("頭も鳴いた語も、語1つにつき1翻（同じ語は2つとも数える）", () => {
+    const r = computeYaku(base([g("いぬ"), g("たぬき"), g("たぬき"), g("くるま", { concealed: false }), g("おみやげ", { concealed: false, kan: true })], { genre, menzen: false }));
+    expect(r.items.find((i) => i.name === "同種ドラ")).toMatchObject({ han: 4, sub: true, note: "動物：いぬ・たぬき・たぬき・おみやげ" });
   });
 
-  it("同種が否決されても、ほかに役があれば同種なしでアガリ", () => {
-    const { game } = makeGame(wall(), { themeB: { name: "生き物", pure: false } });
-    arrangeAs(game, "b", ["あい", "たしか", "かした", "さくら", "くる"]);
-    ronMa(game);
-    const item = game.viewFor("a").vote!.items.find((i) => i.kind === "theme")!;
-    game.act("a", { type: "vote", votes: { [item.id]: false } });
-    expect(game.viewFor("a").result?.kind).toBe("agari");
-    const y = yakuOf(game);
-    expect(y["同種"]).toBeUndefined();
-    expect(y["重回文"]).toBe(5);
+  it("副次役なのでアガリの条件にならない", () => {
+    const r = computeYaku(base([g("いぬ"), g("たぬき"), g("きつね"), g("くるま"), g("さくら")], { genre, extraTiles: false }));
+    expect(names(r)).toMatchObject({ 同種ドラ: 3 });
+    expect(r.mainHan).toBe(r.items.filter((i) => !i.sub).reduce((a, b) => a + b.han, 0));
+    expect(r.han - r.mainHan).toBeGreaterThanOrEqual(3);
+  });
+
+  it("七対子は7語すべてが対象、作文は対象外", () => {
+    const chiitoi = computeYaku(base(["いぬ", "ねこ", "そら", "やま", "かさ", "はな", "いす"].map((w) => g(w, { head: false })), { form: "chiitoi", genre }));
+    expect(names(chiitoi).同種ドラ).toBe(2);
+    const sakubun = computeYaku(base([g("いぬとねこがいるよるのやまだ", { head: false })], { form: "sakubun", genre: { name: "文", words: new Set(["いぬとねこがいるよるのやまだ"]) } }));
+    expect(names(sakubun).同種ドラ).toBeUndefined();
+  });
+
+  it("局ごとに引き直し、語リストは画面に送らない", () => {
+    const list: Genre[] = [
+      { name: "動物", words: new Set(["たぬき"]) },
+      { name: "植物", words: new Set(["さくら"]) },
+    ];
+    let drawn = 0;
+    const game = new Game({
+      settings: { ...DEFAULT_SETTINGS, playerCount: 2, timer: "none", riipaiSeconds: 0 },
+      fast: true,
+      players: [
+        { id: "a", name: "A", isBot: false },
+        { id: "b", name: "B", isBot: false },
+      ],
+      hooks: { update: () => {}, wordApproved: () => {}, playerLex: () => lex, drawGenre: () => list[drawn++ % 2] },
+    });
+    game.start();
+    const v = game.viewFor("a");
+    expect(v.genre).toBe("動物");
+    expect(JSON.stringify(v)).not.toContain("たぬき");
+    expect(drawn).toBe(1);
+  });
+
+  it("data/genres.json の語はすべて辞書にあり、ジャンルの中で重なっていない", () => {
+    const dict = new Set(getWordList().map((w) => w.word));
+    const raw = JSON.parse(readFileSync("data/genres.json", "utf8")) as Record<string, string[]>;
+    expect(Object.keys(raw).length).toBe(10);
+    for (const [name, words] of Object.entries(raw)) {
+      expect(words.filter((w) => !dict.has(w)), name).toEqual([]);
+      expect(new Set(words).size, name).toBe(words.length);
+    }
+  });
+
+  it("清音代用の卓では、清音にした語もジャンルに入る", () => {
+    const raw = JSON.parse(readFileSync("data/genres.json", "utf8")) as Record<string, string[]>;
+    const on = getGenres(true);
+    const off = getGenres(false);
+    expect(on.map((x) => x.name)).toEqual(Object.keys(raw));
+    expect(off[0].words.size).toBe(raw[off[0].name].length);
+    for (const x of on) for (const w of raw[x.name]) expect(x.words.has(toSeion(w))).toBe(true);
   });
 });
 
@@ -763,7 +788,7 @@ describe("デバッグ：配牌の指定", () => {
       settings: { ...DEFAULT_SETTINGS, playerCount: 4, extraTiles: true, timer: "none", riipaiSeconds: 0 },
       fast: true,
       players: ["a", "b", "c", "d"].map((id) => ({ id, name: id.toUpperCase(), isBot: false })),
-      hooks: { update: () => {}, wordApproved: () => {}, playerLex: () => lex, theme: () => null, takeRigs: () => rigs },
+      hooks: { update: () => {}, wordApproved: () => {}, playerLex: () => lex, takeRigs: () => rigs },
     });
     game.start();
     return game;
@@ -834,7 +859,7 @@ describe("デバッグ：鳴いた形で配る・鳴きたがりのCPU", () => {
       settings: { ...DEFAULT_SETTINGS, playerCount: n, extraTiles: true, timer: "none", riipaiSeconds: 0 },
       fast: true,
       players: ["a", "b", "c", "d"].slice(0, n).map((id, i) => ({ id, name: id.toUpperCase(), isBot: !!opts.bot && i > 0, botLevel: "normal" as const, botLex: opts.bot && i > 0 ? lex2 : undefined })),
-      hooks: { update: () => {}, wordApproved: () => {}, playerLex: () => lex2, theme: () => null, takeRigs: () => rigs, debugNaki: (seat) => !!opts.naki && seat > 0 },
+      hooks: { update: () => {}, wordApproved: () => {}, playerLex: () => lex2, takeRigs: () => rigs, debugNaki: (seat) => !!opts.naki && seat > 0 },
     });
     game.start();
     return game;
@@ -902,13 +927,14 @@ describe("デバッグ：鳴いた形で配る・鳴きたがりのCPU", () => {
   it("鳴きたがりのCPUは、手牌で4文字の語ができれば暗カンする", async () => {
     const game = newGame(
       new Map([
-        [0, { words: ["ねこ"], random: false }],
+        // 「ゆ」を使う語は辞書にないので、捨ててもポンされない
+        [0, { words: ["ゆ"], random: false }],
         [1, { words: ["おみやげ"], random: false }],
       ]),
       { n: 2, bot: true, naki: true },
     );
-    const ne = game.viewFor("a").myHand.find((t) => t.ch === "ね")!;
-    expect(game.act("a", { type: "discard", tileId: ne.id })).toBeNull();
+    const yu = game.viewFor("a").myHand.find((t) => t.ch === "ゆ")!;
+    expect(game.act("a", { type: "discard", tileId: yu.id })).toBeNull();
     await wait(() => game.viewFor("a").seats[1].melds.length > 0);
     const m = game.viewFor("a").seats[1].melds[0];
     expect([m.type, m.word]).toEqual(["ankan", "おみやげ"]);
@@ -958,7 +984,7 @@ describe("四開槓", () => {
       settings: { ...DEFAULT_SETTINGS, playerCount: 4, extraTiles: true, timer: "none", riipaiSeconds: 0, suukaikan },
       fast: true,
       players: ["a", "b", "c", "d"].map((id) => ({ id, name: id.toUpperCase(), isBot: false })),
-      hooks: { update: () => {}, wordApproved: () => {}, playerLex: () => lex, theme: () => null, takeRigs: () => rigs },
+      hooks: { update: () => {}, wordApproved: () => {}, playerLex: () => lex, takeRigs: () => rigs },
     });
     game.start();
     return game;

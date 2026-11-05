@@ -8,7 +8,7 @@ import { setKuyouPref, useKuyouPref } from "./Kuyou";
 import { CallDetailDialog, PlaceDialog, toGroups, TsumoDialog } from "./Declare";
 import { Hand } from "./Hand";
 import { FinalModal, ResultModal, VoteModal } from "./Overlays";
-import { ChatPanel, MyWordsPanel, RoomWordsPanel, ThemePanel, YakuPanel } from "./Panels";
+import { ChatPanel, MyWordsPanel, RoomWordsPanel, YakuPanel } from "./Panels";
 import { CenterBox, Meld, NamePlate, Pos, posFor, SeatZone } from "./Seats";
 import { Tile } from "./Tile";
 import { TileCountList } from "./TileCount";
@@ -61,7 +61,7 @@ export function Table() {
   const me = g.mySeat ?? g.watchSeat ?? 0;
   const spectator = g.mySeat === null;
   const watching = spectator ? g.watchSeat : null;
-  const [panel, setPanel] = useState<null | "chat" | "words" | "theme" | "room" | "tiles" | "yaku" | "settings">(null);
+  const [panel, setPanel] = useState<null | "chat" | "words" | "room" | "tiles" | "yaku" | "settings">(null);
   const [callouts, setCallouts] = useState<Callout[]>([]);
   const [riichiMode, setRiichiMode] = useState<null | "riichi" | "open">(null);
   const [chooser, setChooser] = useState<null | { title: string; options: CallOption[]; onPick: (o: CallOption) => void }>(null);
@@ -106,6 +106,20 @@ export function Table() {
           const key = e.seq;
           setCallouts((c) => [...c, { key, pos: "center" as Pos, text: "オーラス", sub: e.text, kind: "allLast" }]);
           setTimeout(() => setCallouts((c) => c.filter((x) => x.key !== key)), 2600);
+        }
+        const genre = g.genre;
+        // 理牌タイムがあるときは案内の中に出す（大きく出すと重なって読めない）
+        if (genre && !g.riipai) {
+          // オーラスの局は、その演出が終わってから出す
+          setTimeout(
+            () => {
+              say(`同種は、${genre}`);
+              const key = e.seq + 0.5;
+              setCallouts((c) => [...c, { key, pos: "center" as Pos, text: genre, sub: "この局の同種ドラ", kind: "genre" }]);
+              setTimeout(() => setCallouts((c) => c.filter((x) => x.key !== key)), 2600);
+            },
+            g.allLast ? 2600 : 300,
+          );
         }
       }
       const text = CALL_TEXT[e.type];
@@ -264,9 +278,6 @@ export function Table() {
           <button className={`tb-btn ${panel === "words" ? "on" : ""}`} onClick={() => setPanel(panel === "words" ? null : "words")}>
             マイ単語
           </button>
-          <button className={`tb-btn ${panel === "theme" ? "on" : ""}`} onClick={() => setPanel(panel === "theme" ? null : "theme")}>
-            同種{g.myTheme && <i className="dot">!</i>}
-          </button>
           <button className={`tb-btn ${panel === "room" ? "on" : ""}`} onClick={() => setPanel(panel === "room" ? null : "room")}>
             ルーム辞書
           </button>
@@ -284,7 +295,7 @@ export function Table() {
         {panel && (
           <div className="side-panel">
             <div className="sp-head">
-              {{ chat: "チャット", words: "マイ単語", theme: "同種の宣言", room: "ルーム辞書", tiles: "牌の一覧", yaku: "役一覧", settings: "設定" }[panel]}
+              {{ chat: "チャット", words: "マイ単語", room: "ルーム辞書", tiles: "牌の一覧", yaku: "役一覧", settings: "設定" }[panel]}
               <button className="btn btn-xs btn-ghost" onClick={() => setPanel(null)}>
                 ✕
               </button>
@@ -292,7 +303,6 @@ export function Table() {
             <div className="sp-body">
               {panel === "chat" && <ChatPanel compact />}
               {panel === "words" && <MyWordsPanel />}
-              {panel === "theme" && <ThemePanel />}
               {panel === "room" && <RoomWordsPanel />}
               {panel === "tiles" && (
                 <div className="panel-sec">
@@ -584,7 +594,7 @@ export function Table() {
           </div>
         )}
         {g.notice && <div className="notice-banner">{g.notice}</div>}
-        {g.riipai && <RiipaiBoard r={g.riipai} />}
+        {g.riipai && <RiipaiBoard r={g.riipai} genre={g.genre} />}
       </div>
 
       {sakuPlace && turnA && (
@@ -664,7 +674,7 @@ function useUnreadChat(open: boolean) {
   return chat.filter((m) => m.id > seen.current && !m.system).length;
 }
 
-function RiipaiBoard({ r }: { r: NonNullable<GameView["riipai"]> }) {
+function RiipaiBoard({ r, genre }: { r: NonNullable<GameView["riipai"]>; genre: string | null }) {
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 250);
@@ -674,6 +684,12 @@ function RiipaiBoard({ r }: { r: NonNullable<GameView["riipai"]> }) {
   return (
     <div className="riipai-board">
       <div className="rb-title">理牌タイム</div>
+      {genre && (
+        <div className="rb-genre">
+          <small>この局の同種ドラ</small>
+          {genre}
+        </div>
+      )}
       {left !== null && (
         <div className={`rb-time ${left <= 10 ? "urgent" : ""}`}>
           {Math.floor(left / 60)}:{String(left % 60).padStart(2, "0")}

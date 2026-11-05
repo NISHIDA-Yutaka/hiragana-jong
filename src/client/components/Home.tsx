@@ -95,6 +95,7 @@ export function Home() {
               アガるには<b>役が1つ以上</b>必要です（リーチ・ツモ・同頭など）。役は対局中の「役」ボタンで見られます。
             </li>
             <li>局の始めに並べる時間（理牌タイム）があり、全員が「理牌完了」を押すと始まります。</li>
+            <li>局ごとにジャンルが出ます。ジャンルに合う語1つにつき、同種ドラが1翻付きます（これだけではアガれません）。</li>
             <li>自分で捨てた文字や、見逃した文字ではロンできません（フリテン）。ツモならアガれます。</li>
             <li>2枚の組＋捨て牌で3文字の語ができるときはポン、3枚以上の組なら4文字以上の語でカンできます。</li>
           </ul>
@@ -110,7 +111,7 @@ export function Home() {
           <div className="modal yaku-modal" onClick={(e) => e.stopPropagation()}>
             <div className="yaku-modal-head">
               <span className="result-title small">役一覧</span>
-              <button className="btn btn-xs btn-ghost" onClick={() => openYakuWindow(null)}>
+              <button className="btn btn-xs btn-ghost" onClick={() => openYakuWindow(null, null)}>
                 別窓で開く
               </button>
               <button className="btn btn-xs btn-ghost" onClick={() => setYakuOpen(false)}>
@@ -118,7 +119,7 @@ export function Home() {
               </button>
             </div>
             <div className="panel-sec yk yaku-modal-body">
-              <YakuList extraTiles={null} />
+              <YakuList extraTiles={null} chiitoi={null} />
             </div>
           </div>
         </div>

@@ -28,7 +28,7 @@ for (let t = 0; t < 200000 && checked < Number(process.argv[2] ?? 60); t++) {
     const rec = (j: number) => {
       if (j === lists.length) {
         if (form === "chiitoi" && new Set(cur).size !== cur.length) return;
-        const y = computeYaku({ form, groups: cur.map((w) => ({ word: w, concealed: true, kan: false, head: form === "standard" && w.length === 2 })), tiles: hand, menzen: true, tsumo: true, riichi: null, ippatsu: false, tenhou: false, chiihou: false, theme: null });
+        const y = computeYaku({ form, groups: cur.map((w) => ({ word: w, concealed: true, kan: false, head: form === "standard" && w.length === 2 })), tiles: hand, menzen: true, tsumo: true, riichi: null, ippatsu: false, tenhou: false, chiihou: false });
         for (const f of reachedFamilies(y.items.map((i) => i.name))) exact.add(f);
         return;
       }

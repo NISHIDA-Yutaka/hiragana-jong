@@ -225,13 +225,6 @@ io.on("connection", (socket) => {
     roomIO.broadcast(s.room);
   });
 
-  socket.on("player:theme", (p: { theme?: { name: string; pure: boolean } | null }) => {
-    const s = ctx();
-    if (!s) return;
-    s.room.setTheme(s.member, p?.theme ?? null);
-    roomIO.broadcast(s.room);
-  });
-
   socket.on("game:action", (a: GameAction, ack) => {
     const reply = safeAck(ack);
     const s = ctx();

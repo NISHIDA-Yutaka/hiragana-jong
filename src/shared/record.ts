@@ -27,7 +27,8 @@ export interface AgariRecord {
   ippatsu: boolean;
   tenhou: boolean;
   chiihou: boolean;
-  theme: { name: string; pure: boolean } | null;
+  /** この局の同種ドラのジャンル */
+  genre: string | null;
   yaku: { name: string; han: number }[];
   han: number;
   yakuman: boolean;

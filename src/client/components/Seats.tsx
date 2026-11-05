@@ -159,6 +159,12 @@ export function CenterBox({ g, mySeat }: { g: GameView; mySeat: number }) {
         <div className="cb-remain">
           残り <b>{g.liveRemaining}</b>
         </div>
+        {g.genre && (
+          <div className="cb-genre" title="この局の同種ドラ：ジャンルに合う語1つにつき1翻">
+            <small>同種</small>
+            {g.genre}
+          </div>
+        )}
       </div>
       {g.seats.map((s) => {
         const pos = posFor(s.seat, mySeat, g.n);

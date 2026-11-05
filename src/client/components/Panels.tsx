@@ -1,6 +1,5 @@
-// チャット・マイ単語・ルーム辞書・同種テーマ・役一覧
+// チャット・マイ単語・ルーム辞書・役一覧
 import { FormEvent, useEffect, useRef, useState } from "react";
-import { THEMES } from "../../shared/yaku";
 import { emit, getMyWords, send, setMyWords, toast, useStore } from "../net";
 import { KuyouHand, useKuyouPref } from "./Kuyou";
 import { openYakuWindow, YakuList } from "./YakuList";
@@ -144,40 +143,17 @@ export function RoomWordsPanel({ lobby }: { lobby?: boolean }) {
   );
 }
 
-export function ThemePanel() {
-  const theme = useStore((s) => s.game?.myTheme ?? null);
-  const set = (name: string, pure: boolean) => send("player:theme", { theme: name ? { name, pure } : null });
-  return (
-    <div className="panel-sec">
-      <p className="hint">同種（頭以外の語が同じテーマ）を狙うときは、アガる前にテーマを宣言しておきます。アガったときに他の人が投票で判定します。</p>
-      <div className="row">
-        <select value={theme?.name ?? ""} onChange={(e) => set(e.target.value, theme?.pure ?? false)}>
-          <option value="">宣言しない</option>
-          {THEMES.map((t) => (
-            <option key={t} value={t}>
-              {t}
-            </option>
-          ))}
-        </select>
-        <label className="check">
-          <input type="checkbox" checked={theme?.pure ?? false} disabled={!theme} onChange={(e) => set(theme!.name, e.target.checked)} />
-          頭も含む（純同種）
-        </label>
-      </div>
-    </div>
-  );
-}
-
 export function YakuPanel() {
   const extraTiles = useStore((s) => s.room?.settings.extraTiles ?? true);
+  const chiitoi = useStore((s) => s.room?.settings.chiitoi ?? true);
   return (
     <div className="panel-sec yk">
       <div className="yk-tools">
-        <button className="btn btn-xs btn-ghost" onClick={() => openYakuWindow(extraTiles)}>
+        <button className="btn btn-xs btn-ghost" onClick={() => openYakuWindow(extraTiles, chiitoi)}>
           別窓で開く
         </button>
       </div>
-      <YakuList extraTiles={extraTiles} />
+      <YakuList extraTiles={extraTiles} chiitoi={chiitoi} />
     </div>
   );
 }

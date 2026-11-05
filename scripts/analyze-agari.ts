@@ -56,9 +56,9 @@ for (const r of target) {
   );
   n++;
   if (res.truncated) truncated++;
-  // 同種（テーマ宣言）は並べ直しでは調べられないので、実際の翻数から除いて比べる
-  const themeHan = r.yaku.filter((y) => y.name === "同種" || y.name === "純同種").reduce((a, b) => a + b.han, 0);
-  const actualHan = r.han - themeHan;
+  // 同種ドラ（局ごとのジャンル）は並べ直しでは調べられないので、実際の翻数から除いて比べる。同種・純同種は以前の記録の分
+  const genreHan = r.yaku.filter((y) => ["同種ドラ", "同種", "純同種"].includes(y.name)).reduce((a, b) => a + b.han, 0);
+  const actualHan = r.han - genreHan;
   const best = Math.max(res.bestHan, actualHan);
   sumHan += actualHan;
   sumBest += best;
@@ -75,7 +75,7 @@ for (const r of target) {
 const pct = (a: number, b: number) => (b ? `${((a / b) * 100).toFixed(1)}%` : "-");
 console.log(`記録 ${records.length} 件中、対象 ${n} 件（${who}、作文 ${sakubun} 件は除外）／辞書 ${dictOverride ?? "記録時の設定"}／${((Date.now() - t0) / 1000).toFixed(1)}秒`);
 if (truncated) console.log(`※ ${truncated} 件は分解が多すぎて途中で打ち切り（作れた役を少なめに数えている可能性）`);
-console.log(`平均翻数（同種を除く）：実際 ${(sumHan / Math.max(1, n)).toFixed(2)} ／ 最高の目安 ${(sumBest / Math.max(1, n)).toFixed(2)}\n`);
+console.log(`平均翻数（同種ドラを除く）：実際 ${(sumHan / Math.max(1, n)).toFixed(2)} ／ 最高の目安 ${(sumBest / Math.max(1, n)).toFixed(2)}\n`);
 console.log("※ 二連は「二連以上」、同頭は「同頭か同頭同尾」のように、その役以上を数えています");
 console.log("役        付いた率  作れた率  見つけた率（付いた/作れた）");
 for (const [name, t] of [...tally.entries()].sort((a, b) => b[1].could - a[1].could)) {

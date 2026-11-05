@@ -20,7 +20,7 @@ import type {
 } from "../shared/protocol";
 import { ARRANGE_SECONDS, TIMER_SECONDS } from "../shared/protocol";
 import { buildTileChars, KINDS, NUM_KINDS, Tile, WIND_NAMES } from "../shared/tiles";
-import { computeYaku, paymentFor, YakuInput, YakuResult } from "../shared/yaku";
+import { computeYaku, Genre, paymentFor, YakuInput, YakuResult } from "../shared/yaku";
 import { BotBrain } from "./bot";
 
 export interface GamePlayerInfo {
@@ -78,7 +78,6 @@ interface Claim {
   sentence?: string;
   /** 作文の牌の並び（アガリ牌を入れた後） */
   sentenceIds?: number[];
-  theme: { name: string; pure: boolean } | null;
   items: VoteItem[];
   ippatsu: boolean;
   tenhou: boolean;
@@ -118,7 +117,8 @@ export interface GameHooks {
   update: () => void;
   wordApproved: (word: string) => void;
   playerLex: (playerId: string) => Lexicon;
-  theme: (playerId: string) => { name: string; pure: boolean } | null;
+  /** 局の始めに同種ドラのジャンルを引く。省くと同種ドラなし */
+  drawGenre?: () => Genre | null;
   log?: (msg: string) => void;
   /** アガリの記録（役のバランスの検証用） */
   record?: (rec: AgariRecord) => void;
@@ -181,6 +181,8 @@ export class Game {
   private windowDeadline: number | null = null;
   private afterCall = false;
   private noCallYet = true;
+  /** この局の同種ドラのジャンル */
+  private genre: Genre | null = null;
   private kanOwners: number[] = [];
   private lastDiscard: { seat: number; tile: Tile } | null = null;
   private calls = new Map<number, CallState>();
@@ -405,6 +407,7 @@ export class Game {
     for (const [seat, melds] of meldRigs) this.giveMelds(seat, melds, rigs.get(seat)?.groups.flat() ?? []);
     for (const hp of this.hands) hp.arr = reconcile(null, hp.hand);
     for (const [seat, r] of rigs) this.hands[seat].arr = rigArrangement(r.groups, r.random, this.hands[seat].hand);
+    this.genre = this.hooks.drawGenre?.() ?? null;
     this.emit("start", this.dealer, `${WIND_NAMES[this.roundWind]}${this.kyoku + 1}局`);
     this.log(`=== ${WIND_NAMES[this.roundWind]}${this.kyoku + 1}局 ${this.honba}本場 ===`);
     // 親は先に14枚目をツモっておき、全員で理牌してから始める（天和の可能性を残す）
@@ -1158,7 +1161,6 @@ export class Game {
     const hp = this.hands[seat];
     const isDealer = seat === this.dealer;
     const form = sentence !== undefined ? "sakubun" : comp!.form;
-    const theme = form === "standard" ? this.hooks.theme(this.players[seat].id) : null;
     const items: VoteItem[] = [];
     let iid = 0;
     if (form === "sakubun") items.push({ id: iid++, kind: "sakubun", text: sentence!.text, detail: "14牌で1つの文章になっていますか？" });
@@ -1171,9 +1173,6 @@ export class Game {
         items.push({ id: iid++, kind: "word", text: w, known: false, detail: "辞書にない語です。言葉として認めますか？" });
       }
     }
-    if (theme) {
-      items.push({ id: iid++, kind: "theme", text: `${theme.pure ? "純同種" : "同種"}「${theme.name}」`, detail: theme.pure ? "頭を含む全ての語が同じテーマですか？" : "頭以外の語が全て同じテーマですか？" });
-    }
     return {
       seat,
       from,
@@ -1182,7 +1181,6 @@ export class Game {
       completed: comp,
       sentence: sentence?.text,
       sentenceIds: sentence?.ids,
-      theme,
       items,
       ippatsu: hp.ippatsu,
       tenhou: from === null && isDealer && hp.discards.length === 0 && this.noCallYet && this.rinshanTaken === 0,
@@ -1202,7 +1200,7 @@ export class Game {
     return [...handGroups, ...meldGroups];
   }
 
-  private yakuFor(claim: Claim, withoutTheme = false): YakuResult {
+  private yakuFor(claim: Claim): YakuResult {
     const hp = this.hands[claim.seat];
     const groups = this.winGroups(claim);
     const inp: YakuInput = {
@@ -1215,7 +1213,7 @@ export class Game {
       ippatsu: claim.ippatsu && !!hp.riichi,
       tenhou: claim.tenhou,
       chiihou: claim.chiihou,
-      theme: withoutTheme ? null : claim.theme,
+      genre: this.genre,
       extraTiles: this.settings.extraTiles,
     };
     return computeYaku(inp);
@@ -1231,7 +1229,7 @@ export class Game {
         c.items = [];
         continue;
       }
-      if (c.form !== "sakubun" && this.yakuFor(c, true).mainHan < 1 && !c.theme) c.invalid = "役がありません";
+      if (c.form !== "sakubun" && this.yakuFor(c).mainHan < 1) c.invalid = "役がありません";
       if (c.invalid) c.items = [];
     }
     const live = claims.filter((c) => !c.invalid);
@@ -1304,28 +1302,21 @@ export class Game {
 
   private applyClaims(results: { claim: Claim; approved: Set<number> }[]) {
     const valid: { claim: Claim; yaku: YakuResult }[] = [];
-    const rejected: { claim: Claim; reason: string; serious: boolean }[] = [];
+    const rejected: { claim: Claim; reason: string }[] = [];
     for (const { claim, approved } of results) {
       if (claim.invalid) {
-        rejected.push({ claim, reason: claim.invalid, serious: true });
+        rejected.push({ claim, reason: claim.invalid });
         continue;
       }
-      const badItem = claim.items.find((i) => i.kind !== "theme" && !approved.has(i.id));
+      const badItem = claim.items.find((i) => !approved.has(i.id));
       for (const i of claim.items) {
         if (i.kind === "word" && !i.known && approved.has(i.id) && !badItem) this.hooks.wordApproved(i.text);
       }
       if (badItem) {
-        rejected.push({ claim, reason: badItem.kind === "word" ? `「${badItem.text}」は認められませんでした` : "作文は認められませんでした", serious: true });
+        rejected.push({ claim, reason: badItem.kind === "word" ? `「${badItem.text}」は認められませんでした` : "作文は認められませんでした" });
         continue;
       }
-      const themeItem = claim.items.find((i) => i.kind === "theme");
-      if (themeItem && !approved.has(themeItem.id)) claim.theme = null;
-      const yaku = this.yakuFor(claim);
-      if (yaku.mainHan < 1) {
-        rejected.push({ claim, reason: "役がありません", serious: false });
-        continue;
-      }
-      valid.push({ claim, yaku });
+      valid.push({ claim, yaku: this.yakuFor(claim) });
     }
     for (const r of rejected) this.emit("reject", r.claim.seat, r.reason);
     if (valid.length > 0) {
@@ -1333,7 +1324,7 @@ export class Game {
       return;
     }
     const first = rejected[0];
-    if (this.settings.rejectPenalty === "chombo" && first.serious) {
+    if (this.settings.rejectPenalty === "chombo") {
       this.chombo(first.claim.seat, first.reason, first.claim.completed?.hand.length || first.claim.form === "sakubun" ? this.winGroups(first.claim) : undefined);
       return;
     }
@@ -1380,7 +1371,7 @@ export class Game {
         ippatsu: claim.ippatsu && !!hp.riichi,
         tenhou: claim.tenhou,
         chiihou: claim.chiihou,
-        theme: claim.theme,
+        genre: this.genre?.name ?? null,
         yaku: yaku.items.map((i) => ({ name: i.name, han: i.han })),
         han: yaku.han,
         yakuman: yaku.yakuman,
@@ -1979,6 +1970,7 @@ export class Game {
       roundWind: this.roundWind,
       kyoku: this.kyoku,
       allLast: this.isAllLast,
+      genre: this.genre?.name ?? null,
       honba: this.honba,
       kyotaku: this.kyotaku,
       dealer: this.dealer,
@@ -2009,7 +2001,6 @@ export class Game {
             }
           : null,
       readyWaiting: this.step === "result" ? this.players.filter((_, i) => !this.ready.has(i)).map((p) => p.name) : [],
-      myTheme: playerId && mySeat !== null ? this.hooks.theme(playerId) : watchSeat !== null ? this.hooks.theme(this.players[watchSeat].id) : null,
     };
   }
 }

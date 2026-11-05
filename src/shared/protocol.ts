@@ -184,7 +184,7 @@ export type ActionsView =
 
 export interface VoteItem {
   id: number;
-  kind: "word" | "theme" | "sakubun";
+  kind: "word" | "sakubun";
   text: string;
   detail?: string;
   /** 辞書（ルーム辞書を含む）にある語か */
@@ -262,6 +262,8 @@ export interface GameView {
   kyoku: number;
   /** オーラス（最後の親の局。本場も含む） */
   allLast: boolean;
+  /** この局の同種ドラのジャンル（語リストは送らない） */
+  genre: string | null;
   honba: number;
   kyotaku: number;
   dealer: number;
@@ -288,7 +290,6 @@ export interface GameView {
   lastDiscard: { seat: number; tileId: number } | null;
   events: GameEvent[];
   readyWaiting: string[];
-  myTheme: { name: string; pure: boolean } | null;
 }
 
 export type GameAction =

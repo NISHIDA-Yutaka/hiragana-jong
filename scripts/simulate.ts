@@ -59,7 +59,6 @@ async function runOne(gi: number) {
         },
         wordApproved: () => {},
         playerLex: () => base,
-        theme: () => null,
         log: verbose ? (m) => console.log(m) : undefined,
         record: recordFile ? (rec) => appendFileSync(recordFile, JSON.stringify(rec) + "\n") : undefined,
       },

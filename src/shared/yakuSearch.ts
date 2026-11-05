@@ -306,7 +306,7 @@ export function searchArrangements(inp: SearchInput, lex: Lexicon, opts: { decom
   const evaluate = (words: string[], form: "standard" | "chiitoi") => {
     budget--;
     const groups: WordGroup[] = [...words.map((w) => ({ word: w, concealed: true, kan: false, head: form === "standard" && [...w].length === 2 })), ...meldGroups];
-    const y = computeYaku({ form, groups, tiles, menzen, tsumo: inp.tsumo, riichi: inp.riichi, ippatsu: inp.ippatsu, tenhou: inp.tenhou, chiihou: inp.chiihou, theme: null, extraTiles: inp.extraTiles });
+    const y = computeYaku({ form, groups, tiles, menzen, tsumo: inp.tsumo, riichi: inp.riichi, ippatsu: inp.ippatsu, tenhou: inp.tenhou, chiihou: inp.chiihou, extraTiles: inp.extraTiles });
     if (y.mainHan < 1) return;
     const han = y.yakuman ? Math.max(13, y.han) : y.han;
     if (han > res.bestHan) {
