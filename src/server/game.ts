@@ -1,5 +1,6 @@
 // 対局の進行（サーバー側で全ての判定を行う）
 import type { AgariRecord } from "../shared/record";
+import type { GameLogLine } from "../shared/gameLog";
 import { Arrangement, checkComplete, Completed, completeWith, groupsWithChars, reconcile, WordCheck } from "../shared/arrange";
 import { Lexicon } from "../shared/lexicon";
 import type {
@@ -122,6 +123,10 @@ export interface GameHooks {
   log?: (msg: string) => void;
   /** アガリの記録（役のバランスの検証用） */
   record?: (rec: AgariRecord) => void;
+  /** 対局の記録（全員の手牌と理牌の状況）。見返す用 */
+  gameLog?: (line: GameLogLine) => void;
+  /** 対局が終わった、または中断された */
+  gameClosed?: () => void;
   /** デバッグ用：次の配牌で配る牌の予約を受け取る（席 → 予約）。受け取った予約は消える */
   takeRigs?: () => Map<number, DealRig>;
   /** デバッグ用：その席のCPUを鳴きたがりにしているか（鳴ける語があれば必ずポン・カンする） */
@@ -228,6 +233,7 @@ export class Game {
 
   destroy() {
     this.destroyed = true;
+    this.hooks.gameClosed?.();
     for (const t of this.timers.values()) clearTimeout(t);
     this.timers.clear();
   }
@@ -281,6 +287,27 @@ export class Game {
   private emit(type: GameEvent["type"], seat: number, text?: string) {
     this.events.push({ seq: ++this.seq, type, seat, text });
     if (this.events.length > 40) this.events.shift();
+    if (type !== "vote" && type !== "reject") this.snap(type, seat, text);
+  }
+
+  /** 今の全員の手牌を記録する。並びは本物を変えないように写しで直す */
+  private snap(ev: string, seat: number, text?: string) {
+    if (!this.hooks.gameLog) return;
+    const hp = this.hands[seat];
+    const drawn = ev === "draw" ? hp.hand.find((t) => t.id === hp.drawnId)?.ch : undefined;
+    this.hooks.gameLog({
+      t: "snap",
+      ev,
+      seat,
+      text: text ?? drawn,
+      wall: this.wall.length - 14 - this.rinshanTaken - this.drawPos,
+      hands: this.hands.map((h) => ({
+        groups: groupsWithChars(reconcile(h.arr, h.hand), h.hand).map((g) => g.word),
+        melds: h.melds.map((m) => ({ type: m.type, word: m.word })),
+        discards: h.discards.map((d) => d.tile.ch),
+        riichi: !!h.riichi,
+      })),
+    });
   }
 
   private log(msg: string) {
@@ -408,6 +435,14 @@ export class Game {
     for (const hp of this.hands) hp.arr = reconcile(null, hp.hand);
     for (const [seat, r] of rigs) this.hands[seat].arr = rigArrangement(r.groups, r.random, this.hands[seat].hand);
     this.genre = this.hooks.drawGenre?.() ?? null;
+    this.hooks.gameLog?.({
+      t: "hand",
+      label: `${WIND_NAMES[this.roundWind]}${this.kyoku + 1}局`,
+      honba: this.honba,
+      dealer: this.dealer,
+      genre: this.genre?.name ?? null,
+      scores: this.players.map((p) => p.score),
+    });
     this.emit("start", this.dealer, `${WIND_NAMES[this.roundWind]}${this.kyoku + 1}局`);
     this.log(`=== ${WIND_NAMES[this.roundWind]}${this.kyoku + 1}局 ${this.honba}本場 ===`);
     // 親は先に14枚目をツモっておき、全員で理牌してから始める（天和の可能性を残す）
@@ -520,6 +555,7 @@ export class Game {
     if (this.step !== "riipai") return;
     this.clearTimer("riipai");
     this.riipaiDeadline = null;
+    this.snap("riipai", this.dealer);
     this.beginTurn(this.dealer, "dealt");
   }
 
@@ -553,6 +589,7 @@ export class Game {
       hp.drawnId = null;
     }
     hp.arr = reconcile(hp.arr, hp.hand);
+    if (kind === "rinshan") this.snap("draw", seat);
     this.turnActions = this.computeTurnActions(seat);
     this.turnStartedAt = Date.now();
     this.armActionTimer(seat, "turn", () => this.autoDiscard(seat));
@@ -1535,6 +1572,17 @@ export class Game {
 
   private toResult(next: () => void) {
     this.step = "result";
+    const r = this.result;
+    if (r) {
+      this.hooks.gameLog?.({
+        t: "result",
+        title: r.title,
+        note: r.note,
+        wins: r.wins.map((w) => ({ name: w.name, words: w.groups.map((g) => g.word), label: w.label, gain: w.gain })),
+        deltas: r.deltas,
+        after: r.after,
+      });
+    }
     this.calls.clear();
     this.turnActions = null;
     this.clearTimer("turn");
@@ -1620,6 +1668,8 @@ export class Game {
     });
     this.final = { ranking, oneHand: this.settings.length === "ikkyoku" };
     this.step = "final";
+    this.hooks.gameLog?.({ t: "end", ranking: ranking.map(({ name, score, rank }) => ({ name, score, rank })) });
+    this.hooks.gameClosed?.();
     this.log(`=== 終局 ${ranking.map((r) => `${r.rank}位 ${r.name} ${r.score}`).join(" / ")} ===`);
   }
 

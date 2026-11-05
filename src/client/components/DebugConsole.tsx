@@ -1,6 +1,9 @@
 // デバッグ用のコンソール。Ctrl+Esc か Ctrl+Alt+D で開閉する（サーバーが DEBUG_COMMANDS=1 で動いているときだけコマンドが通る）
-import { FormEvent, KeyboardEvent as RKeyboardEvent, useEffect, useRef, useState } from "react";
+import { FormEvent, KeyboardEvent as RKeyboardEvent, lazy, Suspense, useEffect, useRef, useState } from "react";
 import { emit } from "../net";
+
+// /log で開く対局の記録。DEBUG_COMMANDS がなくても使える（終わった対局しか見られない）
+const GameLogViewer = lazy(() => import("./GameLogViewer"));
 
 interface Line {
   kind: "in" | "out" | "err";
@@ -53,6 +56,7 @@ export default function DebugConsole() {
   const [open, setOpen] = useState(false);
   const [lines, setLines] = useState<Line[]>([{ kind: "out", text: "/help でコマンドの一覧を出します" }]);
   const [text, setText] = useState("");
+  const [viewer, setViewer] = useState(false);
   const history = useRef<string[]>([]);
   const histPos = useRef(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -77,7 +81,12 @@ export default function DebugConsole() {
     logRef.current?.scrollTo(0, logRef.current.scrollHeight);
   }, [lines, open]);
 
-  if (!open) return null;
+  const logViewer = viewer && (
+    <Suspense fallback={null}>
+      <GameLogViewer onClose={() => setViewer(false)} />
+    </Suspense>
+  );
+  if (!open) return logViewer || null;
 
   const run = async (e: FormEvent) => {
     e.preventDefault();
@@ -87,6 +96,11 @@ export default function DebugConsole() {
     histPos.current = history.current.length;
     setText("");
     setLines((ls) => [...ls, { kind: "in", text: `> ${t}` }]);
+    if (t === "/log") {
+      setViewer(true);
+      setOpen(false);
+      return;
+    }
     const res = await emit<{ lines?: string[]; error?: string }>("debug:command", { text: t });
     setLines((ls) => [...ls, ...(res.error ? [{ kind: "err" as const, text: res.error }] : (res.lines ?? []).map((text) => ({ kind: "out" as const, text })))].slice(-200));
   };
@@ -102,6 +116,8 @@ export default function DebugConsole() {
   };
 
   return (
+    <>
+      {logViewer}
     <div className="dbg">
       <style>{CSS}</style>
       <div className="dbg-head">デバッグコンソール（Esc で閉じる）</div>
@@ -117,5 +133,6 @@ export default function DebugConsole() {
         <input ref={inputRef} value={text} onChange={(e) => setText(e.target.value)} onKeyDown={onInputKey} spellCheck={false} autoComplete="off" />
       </form>
     </div>
+    </>
   );
 }

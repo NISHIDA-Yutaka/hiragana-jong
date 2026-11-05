@@ -8,6 +8,7 @@ import { Server, Socket } from "socket.io";
 import type { Arrangement } from "../shared/arrange";
 import type { BotLevel, GameAction, RoomSettings } from "../shared/protocol";
 import { readAgariLog } from "./agariLog";
+import { listGameLogs, readGameLog } from "./gameLog";
 import { getWordList, getBaseLexicon } from "./dict";
 import { debugCommand, DEBUG_ENABLED } from "./debug";
 import { Member, Room } from "./room";
@@ -266,6 +267,19 @@ io.on("connection", (socket) => {
     const s = ctx();
     if (!s) return reply({ error: "部屋に入っていません" });
     reply(debugCommand(s.room, s.member, String(p?.text ?? "")));
+  });
+
+  // 終わった対局の記録。返すのは頼んだ本人にだけで、部屋のほかの人には何も送らない
+  socket.on("log:list", (_p, ack) => {
+    const reply = safeAck(ack);
+    if (!ctx()) return reply({ error: "部屋に入っていません" });
+    reply({ games: listGameLogs() });
+  });
+  socket.on("log:get", (p: { id?: string }, ack) => {
+    const reply = safeAck(ack);
+    if (!ctx()) return reply({ error: "部屋に入っていません" });
+    const lines = readGameLog(String(p?.id ?? ""));
+    reply(lines ? { lines } : { error: "その対局の記録は見られません" });
   });
 
   socket.on("disconnect", () => detach(socket));

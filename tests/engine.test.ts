@@ -1,6 +1,8 @@
-import { readFileSync } from "fs";
+import { mkdtempSync, readdirSync, readFileSync, writeFileSync } from "fs";
+import { tmpdir } from "os";
+import path from "path";
 import { checkKuyou } from "../src/shared/kuyou";
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { checkComplete, completeWith, groupsWithChars, reconcile } from "../src/shared/arrange";
 import { Lexicon } from "../src/shared/lexicon";
 import { DEFAULT_SETTINGS, type RoomSettings } from "../src/shared/protocol";
@@ -8,6 +10,8 @@ import { buildTileChars, tileSupply, toSeion } from "../src/shared/tiles";
 import { computeYaku, type Genre, paymentFor, type WordGroup, type YakuInput } from "../src/shared/yaku";
 import { type DealRig, Game } from "../src/server/game";
 import { debugCommand } from "../src/server/debug";
+import { listGameLogs, openGameLog, readGameLog } from "../src/server/gameLog";
+import type { GameLogLine } from "../src/shared/gameLog";
 import { getGenres, getWordList } from "../src/server/dict";
 import { Member, Room } from "../src/server/room";
 import { reachedFamilies, searchArrangements } from "../src/shared/yakuSearch";
@@ -1131,5 +1135,66 @@ describe("オーラス", () => {
       [0, 0],
       [1, 1],
     ]);
+  });
+});
+
+describe("対局の記録", () => {
+  const dir = mkdtempSync(path.join(tmpdir(), "gamelog-"));
+  const players = [
+    { name: "A", isBot: false },
+    { name: "B", isBot: true },
+  ];
+  beforeEach(() => {
+    process.env.LOG_DIR = dir;
+  });
+  afterEach(() => {
+    delete process.env.LOG_DIR;
+  });
+
+  it("進行中の対局は一覧にも出さず、読み出しも断る。終わると読める", () => {
+    const rec = openGameLog("ROOM", players);
+    const id = readdirSync(path.join(dir, "games"))
+      .map((f) => f.replace(".jsonl", ""))
+      .find((x) => x.includes("ROOM"))!;
+    expect(listGameLogs().map((g) => g.id)).not.toContain(id);
+    expect(readGameLog(id)).toBeNull();
+    rec.finish();
+    expect(listGameLogs().map((g) => g.id)).toContain(id);
+    expect(readGameLog(id)?.[0]).toMatchObject({ t: "start", room: "ROOM" });
+  });
+
+  it("形の違う id ではファイルを読まない", () => {
+    writeFileSync(path.join(dir, "secret.jsonl"), "{}\n");
+    for (const id of ["secret", "../secret", "../../etc/passwd", ""]) expect(readGameLog(id)).toBeNull();
+  });
+
+  it("対局中の全員の手牌を、理牌の区切りごと記録する", () => {
+    const lines: GameLogLine[] = [];
+    let closed = 0;
+    const game = new Game({
+      settings: { ...DEFAULT_SETTINGS, playerCount: 4, extraTiles: true, timer: "none", riipaiSeconds: 0 },
+      fast: true,
+      players: ["a", "b", "c", "d"].map((id) => ({ id, name: id.toUpperCase(), isBot: false })),
+      hooks: { update: () => {}, wordApproved: () => {}, playerLex: () => lex, gameLog: (l) => lines.push(l), gameClosed: () => closed++ },
+    });
+    game.start();
+    const first = lines.find((l) => l.t === "snap" && l.ev === "start");
+    expect(lines[0]).toMatchObject({ t: "hand", label: "東1局" });
+    if (first?.t !== "snap") throw new Error("配牌の記録がない");
+    expect(first.hands).toHaveLength(4);
+    for (const h of first.hands) expect([...h.groups.join("")]).toHaveLength(13);
+
+    // Bが3枚目の後ろで区切ると、次の打牌の記録にその区切りが残る
+    const b = game.viewFor("b").myHand.map((t) => t.id);
+    game.setArrangement("b", { order: b, breaks: [b[2]] });
+    const cut = game.viewFor("a").myHand[0];
+    const cutCh = cut.ch;
+    expect(game.act("a", { type: "discard", tileId: cut.id })).toBeNull();
+    const after = lines.find((l) => l.t === "snap" && l.ev === "discard");
+    if (after?.t !== "snap") throw new Error("打牌の記録がない");
+    expect(after.hands[1].groups.map((g) => [...g].length)).toEqual([3, 10]);
+    expect(after.hands[0].discards).toEqual([cutCh]);
+    game.destroy();
+    expect(closed).toBe(1);
   });
 });

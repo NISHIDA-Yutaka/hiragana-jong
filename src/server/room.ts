@@ -8,6 +8,7 @@ import { normalizeInput, tileSupply, toSeion } from "../shared/tiles";
 import type { Genre } from "../shared/yaku";
 import { getBaseLexicon, getBotLexicon, getGenres } from "./dict";
 import { appendAgari } from "./agariLog";
+import { openGameLog } from "./gameLog";
 import { DealRig, Game } from "./game";
 
 export interface Member {
@@ -295,6 +296,7 @@ export class Room {
     const cfg = this.dictConfig();
     this.roomLex(); // 辞書を先に用意
     let lastGenre: Genre | null = null;
+    const gameLog = openGameLog(this.code, seated.map((m) => ({ name: m.name, isBot: m.isBot })));
     this.game = new Game({
       settings: { ...this.settings },
       players: seated.map((m, i) => ({
@@ -316,6 +318,8 @@ export class Room {
           return lastGenre;
         },
         record: (rec) => appendAgari({ ...rec, room: this.code }),
+        gameLog: (line) => gameLog.write(line),
+        gameClosed: () => gameLog.finish(),
         takeRigs: () => {
           const out = new Map<number, DealRig>();
           for (const [id, rig] of this.debugRigs) {
