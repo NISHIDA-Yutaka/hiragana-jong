@@ -165,7 +165,7 @@ export default function GameLogViewer({ onClose }: { onClose: () => void }) {
         (games === null ? (
           <div>読み込み中…</div>
         ) : games.length === 0 ? (
-          <div>終わった対局の記録はまだありません</div>
+          <div>自分が打った対局の記録はまだありません</div>
         ) : (
           <div>
             {games.map((g) => (

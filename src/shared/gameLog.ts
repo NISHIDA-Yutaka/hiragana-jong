@@ -10,7 +10,8 @@ export interface LogSeat {
 }
 
 export type GameLogLine =
-  | { t: "start"; v: 1; id: string; at: string; room: string; players: { name: string; isBot: boolean }[] }
+  /** owner はその席のブラウザの鍵のハッシュ。ファイルにだけ残し、クライアントには渡さない */
+  | { t: "start"; v: 1; id: string; at: string; room: string; players: { name: string; isBot: boolean; owner?: string }[] }
   | { t: "hand"; label: string; honba: number; dealer: number; genre: string | null; scores: number[] }
   /** ev は GameEvent の種類か、理牌が終わった時点の "riipai" */
   | { t: "snap"; ev: string; seat: number; text?: string; wall: number; hands: LogSeat[] }

@@ -10,7 +10,7 @@ import { buildTileChars, tileSupply, toSeion } from "../src/shared/tiles";
 import { computeYaku, type Genre, paymentFor, type WordGroup, type YakuInput } from "../src/shared/yaku";
 import { type DealRig, Game } from "../src/server/game";
 import { debugCommand } from "../src/server/debug";
-import { listGameLogs, openGameLog, readGameLog } from "../src/server/gameLog";
+import { listGameLogs, ownerOf, openGameLog, readGameLog } from "../src/server/gameLog";
 import type { GameLogLine } from "../src/shared/gameLog";
 import { getGenres, getWordList } from "../src/server/dict";
 import { Member, Room } from "../src/server/room";
@@ -1140,8 +1140,9 @@ describe("オーラス", () => {
 
 describe("対局の記録", () => {
   const dir = mkdtempSync(path.join(tmpdir(), "gamelog-"));
+  const me = ownerOf("key-of-player-a-0123")!;
   const players = [
-    { name: "A", isBot: false },
+    { name: "A", isBot: false, owner: me },
     { name: "B", isBot: true },
   ];
   beforeEach(() => {
@@ -1156,16 +1157,42 @@ describe("対局の記録", () => {
     const id = readdirSync(path.join(dir, "games"))
       .map((f) => f.replace(".jsonl", ""))
       .find((x) => x.includes("ROOM"))!;
-    expect(listGameLogs().map((g) => g.id)).not.toContain(id);
-    expect(readGameLog(id)).toBeNull();
+    expect(listGameLogs(me).map((g) => g.id)).not.toContain(id);
+    expect(readGameLog(id, me)).toBeNull();
     rec.finish();
-    expect(listGameLogs().map((g) => g.id)).toContain(id);
-    expect(readGameLog(id)?.[0]).toMatchObject({ t: "start", room: "ROOM" });
+    expect(listGameLogs(me).map((g) => g.id)).toContain(id);
+    expect(readGameLog(id, me)?.[0]).toMatchObject({ t: "start", room: "ROOM" });
+  });
+
+  it("席についていなかった人には、一覧にも出さず読み出しも断る", () => {
+    const rec = openGameLog("OTHER", players);
+    rec.write({ t: "end", ranking: [] });
+    rec.finish();
+    const id = listGameLogs(me).find((g) => g.room === "OTHER")!.id;
+    const stranger = ownerOf("key-of-a-stranger-456")!;
+    for (const who of [stranger, undefined]) {
+      expect(listGameLogs(who).map((g) => g.id)).not.toContain(id);
+      expect(readGameLog(id, who)).toBeNull();
+    }
+  });
+
+  it("持ち主の印のない古い記録は誰にも見せず、読み出した記録にも印を含めない", () => {
+    const rec = openGameLog("OLD", [{ name: "A", isBot: false }]);
+    rec.finish();
+    expect(listGameLogs(me).map((g) => g.room)).not.toContain("OLD");
+    const open = openGameLog("MINE", players);
+    open.finish();
+    const id = listGameLogs(me).find((g) => g.room === "MINE")!.id;
+    expect(JSON.stringify(readGameLog(id, me))).not.toContain(me);
+  });
+
+  it("短すぎる鍵や文字列でない鍵は持ち主として扱わない", () => {
+    for (const key of ["", "short", 123, null, undefined, "x".repeat(129)]) expect(ownerOf(key)).toBeUndefined();
   });
 
   it("形の違う id ではファイルを読まない", () => {
     writeFileSync(path.join(dir, "secret.jsonl"), "{}\n");
-    for (const id of ["secret", "../secret", "../../etc/passwd", ""]) expect(readGameLog(id)).toBeNull();
+    for (const id of ["secret", "../secret", "../../etc/passwd", ""]) expect(readGameLog(id, me)).toBeNull();
   });
 
   it("対局中の全員の手牌を、理牌の区切りごと記録する", () => {

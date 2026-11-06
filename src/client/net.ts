@@ -3,7 +3,23 @@ import { useSyncExternalStore } from "react";
 import { io, Socket } from "socket.io-client";
 import type { GameView, RoomView } from "../shared/protocol";
 
-export const socket: Socket = io({ transports: ["websocket", "polling"] });
+// ?as=名前 を付けると保存先を分けられる（同じPCで複数人を試すとき用）
+const AS = new URL(location.href).searchParams.get("as");
+const LS = "hiragajong:" + (AS ? AS + ":" : "");
+
+/** このブラウザの鍵。自分が打った対局の記録を見分けるのに使う */
+function playerKey(): string {
+  const make = () => Array.from(crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, "0")).join("");
+  try {
+    const k = localStorage.getItem(LS + "playerKey") ?? make();
+    localStorage.setItem(LS + "playerKey", k);
+    return k;
+  } catch {
+    return make();
+  }
+}
+
+export const socket: Socket = io({ transports: ["websocket", "polling"], auth: { key: playerKey() } });
 
 export interface Session {
   code: string;
@@ -38,9 +54,6 @@ export function useStore<T>(sel: (s: State) => T): T {
 }
 export const getState = () => state;
 
-// ?as=名前 を付けると保存先を分けられる（同じPCで複数人を試すとき用）
-const AS = new URL(location.href).searchParams.get("as");
-const LS = "hiragajong:" + (AS ? AS + ":" : "");
 function loadSession(): Session | null {
   try {
     const s = JSON.parse(localStorage.getItem(LS + "session") || "null");

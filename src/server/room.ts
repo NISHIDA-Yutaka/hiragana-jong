@@ -17,6 +17,8 @@ export interface Member {
   token: string;
   isBot: boolean;
   botLevel?: BotLevel;
+  /** 対局の記録の持ち主の印。ブラウザの鍵から作る（CPUにはない） */
+  owner?: string;
   sockets: Set<string>;
   myWords: string[];
   joinedAt: number;
@@ -296,7 +298,7 @@ export class Room {
     const cfg = this.dictConfig();
     this.roomLex(); // 辞書を先に用意
     let lastGenre: Genre | null = null;
-    const gameLog = openGameLog(this.code, seated.map((m) => ({ name: m.name, isBot: m.isBot })));
+    const gameLog = openGameLog(this.code, seated.map((m) => ({ name: m.name, isBot: m.isBot, owner: m.owner })));
     this.game = new Game({
       settings: { ...this.settings },
       players: seated.map((m, i) => ({

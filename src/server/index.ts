@@ -8,7 +8,7 @@ import { Server, Socket } from "socket.io";
 import type { Arrangement } from "../shared/arrange";
 import type { BotLevel, GameAction, RoomSettings } from "../shared/protocol";
 import { readAgariLog } from "./agariLog";
-import { listGameLogs, readGameLog } from "./gameLog";
+import { listGameLogs, ownerOf, readGameLog } from "./gameLog";
 import { getWordList, getBaseLexicon } from "./dict";
 import { debugCommand, DEBUG_ENABLED } from "./debug";
 import { Member, Room } from "./room";
@@ -57,6 +57,7 @@ function cleanName(raw: unknown): string | null {
 function attach(socket: Socket, room: Room, member: Member) {
   const prev = sessions.get(socket.id);
   if (prev && (prev.room !== room || prev.member !== member)) detach(socket);
+  member.owner = ownerOf(socket.handshake.auth?.key) ?? member.owner;
   member.sockets.add(socket.id);
   sessions.set(socket.id, { room, member });
   socket.join(room.code);
@@ -269,16 +270,16 @@ io.on("connection", (socket) => {
     reply(debugCommand(s.room, s.member, String(p?.text ?? "")));
   });
 
-  // 終わった対局の記録。返すのは頼んだ本人にだけで、部屋のほかの人には何も送らない
+  // 終わった対局の記録。席についていた対局だけを、頼んだ本人にだけ返す。部屋のほかの人には何も送らない
   socket.on("log:list", (_p, ack) => {
     const reply = safeAck(ack);
     if (!ctx()) return reply({ error: "部屋に入っていません" });
-    reply({ games: listGameLogs() });
+    reply({ games: listGameLogs(ownerOf(socket.handshake.auth?.key)) });
   });
   socket.on("log:get", (p: { id?: string }, ack) => {
     const reply = safeAck(ack);
     if (!ctx()) return reply({ error: "部屋に入っていません" });
-    const lines = readGameLog(String(p?.id ?? ""));
+    const lines = readGameLog(String(p?.id ?? ""), ownerOf(socket.handshake.auth?.key));
     reply(lines ? { lines } : { error: "その対局の記録は見られません" });
   });
 
